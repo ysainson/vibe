@@ -1,0 +1,16 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "ysainson",
+  "description": "Yann's personal plugin marketplace: the VIBE build pipeline. A vibe-coding surface (one command, fast) over a disciplined core - test-first builds, model-tiered doers, mandatory review of every diff, and an independent fresh-context verifier. The VIBE core plus per-stack overlays, updated from one place.",
+  "owner": {
+    "name": "ysainson",
+    "url": "https://github.com/ysainson"
+  },
+  "plugins": [
+    {
+      "name": "vibe",
+      "source": "./plugins/vibe",
+      "description": "Disciplined, model-adaptive build pipeline disguised as vibe coding: idea -> brief -> scaffold -> test-first build, where every diff is reviewed and a fresh-context verifier signs off before anything is called done. It looks like vibe coding; it's the opposite."
+    }
+  ]
+}
