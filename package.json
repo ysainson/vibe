@@ -1,0 +1,14 @@
+{
+  "name": "vibe-tools",
+  "private": true,
+  "type": "module",
+  "description": "Dev + release tooling for the VIBE marketplace. Bun always.",
+  "scripts": {
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "latest"
+  }
+}

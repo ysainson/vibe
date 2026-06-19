@@ -27,6 +27,7 @@ The orchestration engine. Pure process — no framework knowledge.
 
 | Component | What it is |
 |---|---|
+| `/vibe:setup` | Brief-driven scaffolder: reads a project brief, asks only the gaps via `vibe:clarify`, detects the stack, scaffolds the skeleton + tooling baseline + `CLAUDE.md` (not features), and writes `.claude/settings.json` enabling the VIBE core and the matching stack overlay. User-only (`disable-model-invocation: true`). |
 | `/vibe:conduct` | Orchestrated coding flow: the session model plans, writes a failing test contract, lays out a numbered commit-per-task plan, delegates implementation to model-tiered doer subagents, reviews **every** diff in two passes, and gates completion through an independent fresh-context verifier. A thin command wrapper over the `conduct` skill — commands display namespaced (`/vibe:*`) in autocomplete while the backing skill carries `user-invocable: false` to stay model-invocable without a duplicate menu entry. |
 | `vibe:doer` | Implementation subagent (Sonnet by default). |
 | `vibe:doer-mechanical` | Mechanical-edit subagent (Haiku by default) — renames, codemods, boilerplate. |
@@ -63,8 +64,12 @@ Routing lives in **one place**: the `PROFILE` line + table in `plugins/vibe/skil
 
 Claude Code **2.1.154+** for the full feature set used here: dependency version constraints (2.1.110+), `displayName` and the enable/disable dependency cascade (2.1.143+), and `defaultEnabled` (2.1.154+).
 
+## Development
+
+The marketplace is Markdown + JSON; the `tools/` sidecar is Bun + TypeScript (Bun always — never npm/yarn/pnpm). Run `bun install`, then `bun test` and `bun run typecheck`. Validate manifests with `claude plugin validate . --strict` and `claude plugin validate ./plugins/vibe --strict`.
+
 ## Status
 
-Built and validated: the marketplace skeleton and the `vibe` core orchestration engine (`conduct` + the doer/reviewer/verifier agents + the `clarify`/`profile-policy`/`fable-safe-authoring` skills).
+Built and validated: the marketplace skeleton, the `vibe` core orchestration engine (`conduct` + the doer/reviewer/verifier agents + the `clarify`/`profile-policy`/`fable-safe-authoring` skills), `/vibe:setup` (brief-driven scaffolder), and the Bun/TypeScript tooling sidecar.
 
-Planned: `/vibe:setup` (brief-driven scaffolder), `/vibe:brainstorm`, the `/vibe:review` · `/vibe:commit` · `/vibe:fix` · `/vibe:quick-check` suite, the `vibe-swift` overlay with pinned third-party expert skills, and the Bun/TypeScript release sidecar.
+Planned: `/vibe:brainstorm`, the `/vibe:review` · `/vibe:commit` · `/vibe:fix` · `/vibe:quick-check` suite, the `vibe-swift` overlay with pinned third-party expert skills, and the release pipeline (version bump + tag + GitHub release).
