@@ -20,7 +20,7 @@ Look up and target the latest stable; the numbers below are a mid-2026 snapshot 
 - **Swift Testing.** New logic ships with `@Test` coverage that drives the state machine through fakes; time is a deterministic injected seam, never a wall-clock wait.
 - **`docs/specs/` and `docs/plans/`** seeded — the durable trail `/vibe:conduct` writes into.
 - **Release pipeline.** Developer ID signing + notarization + DMG + Sparkle via GitHub Actions — see [distribution.md](references/distribution.md).
-- **Dependencies.** Consult the two VIBE Swift expert skills (`swiftui-expert`, `swift-testing-expert`) for SwiftUI and Swift Testing specifics instead of guessing.
+- **Dependencies.** Consult the `swiftui-expert-skill` and `swift-testing-expert` skills (re-exported by the `swiftui-expert` / `swift-testing-expert` plugins) for SwiftUI and Swift Testing specifics instead of guessing.
 
 ## Guardians
 

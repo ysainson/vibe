@@ -21,7 +21,7 @@ git diff --cached
 - `vibe:security-verifier` — secrets, injection, authz, unsafe data handling, dependency risk.
 
 **Stack overlay (by changed file type):**
-- If `.swift` files changed: `vibe-swift:swift-concurrency` and `vibe-swift:swift-testability`; add `vibe-swift:swift-signing` only when signing, entitlements, or release config changed. Consult the `swiftui-expert` / `swift-testing-expert` skills for specifics.
+- If `.swift` files changed: `vibe-swift:swift-concurrency` and `vibe-swift:swift-testability`; add `vibe-swift:swift-signing` only when signing, entitlements, or release config changed. Consult the `swiftui-expert-skill` / `swift-testing-expert` skills for specifics.
 - Other overlays add their guardians here as they ship.
 
 **Project-local (discover, then dispatch what applies):**

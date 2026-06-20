@@ -82,7 +82,7 @@ Routing lives in **one place**: the `PROFILE` line + table in `plugins/vibe/skil
 
 ## Requirements
 
-Claude Code **2.1.154+** for the full feature set used here: dependency version constraints (2.1.110+), `displayName` and the enable/disable dependency cascade (2.1.143+), and `defaultEnabled` (2.1.154+).
+Claude Code **2.1.143+** — for the plugin dependency cascade: enabling a plugin auto-enables its declared `dependencies`, so installing `vibe` pulls in `superpowers`, and `vibe-swift` pulls in `swiftui-expert` + `swift-testing-expert`.
 
 ## Development
 

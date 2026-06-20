@@ -49,6 +49,31 @@ export function tagIsNewer(latest: string, pinned: string): boolean {
   return false;
 }
 
+/** A plain version tag (v6.0.3, 4.0.0) — not a pre-release/build like v1.0.0-rc1 or 2.0.0+build. */
+export function isStableTag(tag: string): boolean {
+  return /^v?\d+\.\d+(\.\d+)?$/.test(tag);
+}
+
+/**
+ * Highest stable semver tag (and its sha) from a flat tag list, ignoring pre-releases.
+ * The /tags API returns tags in rough ref order, not semver, so the newest can sit
+ * anywhere in the list — never assume it's first.
+ */
+export function pickLatestStable(
+  tags: { tag: string; sha: string }[],
+): { tag: string; sha: string } | null {
+  let best: { tag: string; sha: string } | null = null;
+  for (const t of tags) {
+    if (!isStableTag(t.tag)) {
+      continue;
+    }
+    if (!best || tagIsNewer(t.tag, best.tag)) {
+      best = t;
+    }
+  }
+  return best;
+}
+
 // --- IO + interactive flow (only runs when invoked directly) ---
 
 type Row = Reexport & { latest: { tag: string; sha: string } | null };
@@ -57,27 +82,27 @@ type BehindRow = Reexport & { latest: { tag: string; sha: string } };
 const ROOT = join(import.meta.dir, "..");
 const MARKETPLACE = join(ROOT, ".claude-plugin", "marketplace.json");
 
-/** Highest version-like tag (and its commit sha) for a GitHub repo, via gh. */
+/** Highest stable version tag (and its commit sha) for a GitHub repo, via gh. */
 function latestTag(repo: string): { tag: string; sha: string } | null {
+  // --paginate + per_page=100: the /tags endpoint returns at most 30 per page in
+  // rough ref order (not semver), so a single page can silently miss the newest tag
+  // once a repo has many tags. Fetch them all, then pick the highest stable one.
   const r = spawnSync(
     "gh",
-    ["api", `repos/${repo}/tags`, "--jq", '.[] | "\\(.name) \\(.commit.sha)"'],
+    ["api", "--paginate", `repos/${repo}/tags?per_page=100`, "--jq", '.[] | "\\(.name) \\(.commit.sha)"'],
     { encoding: "utf8" },
   );
   if (r.status !== 0) {
     return null;
   }
-  let best: { tag: string; sha: string } | null = null;
-  for (const line of (r.stdout || "").split("\n").filter(Boolean)) {
-    const [tag, sha] = line.split(" ");
-    if (!/^v?\d+\.\d+/.test(tag)) {
-      continue;
-    }
-    if (!best || tagIsNewer(tag, best.tag)) {
-      best = { tag, sha };
-    }
-  }
-  return best;
+  const tags = (r.stdout || "")
+    .split("\n")
+    .filter(Boolean)
+    .map((line) => {
+      const [tag, sha] = line.split(" ");
+      return { tag, sha };
+    });
+  return pickLatestStable(tags);
 }
 
 async function main() {
