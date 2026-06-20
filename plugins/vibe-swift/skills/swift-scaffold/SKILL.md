@@ -10,7 +10,7 @@ This is the shape `/vibe:setup` scaffolds for a Swift / macOS project and `/vibe
 
 ## Toolchain — resolve current stable at scaffold time
 
-Look up and target the latest stable; the numbers below are a mid-2026 snapshot **to verify, never to copy**: Xcode 26.x (Swift 6.3.x), the macOS 26 SDK, deployment floor macOS 15, Swift 6 language mode with Approachable Concurrency (Default Actor Isolation = MainActor), Swift Testing for tests (XCTest only for UI/perf), Sparkle 2.9.x for updates. Record the versions you actually resolved in the project's `CLAUDE.md`.
+Look up and target the latest stable; the numbers below are a mid-2026 snapshot **to verify, never to copy**: Xcode 26.x (Swift 6.3.x), the macOS 26 SDK, deployment floor macOS 15, Swift 6 language mode with Approachable Concurrency (Default Actor Isolation = MainActor), Swift Testing for tests (XCTest only for UI/perf), Sparkle 2.9.x for updates. Record the versions you actually resolved in the project's `CLAUDE.md`. Default Actor Isolation = MainActor is wired as a build setting in an Xcode app target and as `swiftSettings: [.defaultIsolation(MainActor.self)]` (Swift tools 6.2+) in a `Package.swift` target; where it isn't enabled, annotate the state types `@MainActor` explicitly.
 
 ## Project shape
 
