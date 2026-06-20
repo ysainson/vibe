@@ -1,0 +1,9 @@
+{
+  "name": "vibe-swift",
+  "description": "VIBE overlay for Swift / macOS. Ships concurrency, testability, and signing guardian agents and the Swift scaffold knowledge /vibe:setup uses. Resolves the latest stable Swift/Xcode/macOS toolchain at scaffold time.",
+  "version": "1.0.0",
+  "author": {
+    "name": "ysainson"
+  },
+  "dependencies": ["swiftui-expert", "swift-testing-expert"]
+}

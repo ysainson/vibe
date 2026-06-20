@@ -5,7 +5,8 @@
   "description": "Dev + release tooling for the VIBE marketplace. Bun always.",
   "scripts": {
     "test": "bun test",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "release": "bun tools/release.ts"
   },
   "devDependencies": {
     "@types/bun": "latest",

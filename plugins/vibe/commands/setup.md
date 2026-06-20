@@ -43,4 +43,5 @@ The brief is `$ARGUMENTS` (a path to a brief markdown file). If empty, look for 
 
 - **Resolve latest stable versions at scaffold time.** Look up the current stable version of every tool, SDK, and dependency you write into the scaffold — never embed a constant from this command or a reference project; those rot. A brief's version numbers are a snapshot to re-verify, not a pin.
 - **Scaffold, don't build.** The deliverable is a wired, buildable skeleton; features come later through `/vibe:conduct`.
+- **Start at `1.0.0`.** Initialize new manifests and project versions at `1.0.0` unless the brief says otherwise — not `0.1.0`.
 - Confirm the result against evidence: the skeleton builds or validates at its baseline, `CLAUDE.md` exists, and `.claude/settings.json` matches the canonical shape above with exactly the selected plugins enabled.

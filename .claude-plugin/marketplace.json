@@ -11,6 +11,41 @@
       "name": "vibe",
       "source": "./plugins/vibe",
       "description": "Disciplined, model-adaptive build pipeline disguised as vibe coding: idea -> brief -> scaffold -> test-first build, where every diff is reviewed and a fresh-context verifier signs off before anything is called done. It looks like vibe coding; it's the opposite."
+    },
+    {
+      "name": "vibe-swift",
+      "source": "./plugins/vibe-swift",
+      "description": "VIBE overlay for Swift / macOS: concurrency, testability, and signing/notarization guardian agents, plus the Swift scaffold knowledge /vibe:setup uses. Depends on the re-exported swiftui-expert and swift-testing-expert skills."
+    },
+    {
+      "name": "superpowers",
+      "description": "Re-exported and pinned: obra/superpowers - the agentic SDLC phase engine the VIBE conduct skill wraps (brainstorming, writing-plans, subagent-driven-development, test-driven-development, code review, finishing-a-development-branch).",
+      "source": {
+        "source": "github",
+        "repo": "obra/superpowers",
+        "ref": "v6.0.3",
+        "sha": "896224c4b1879920ab573417e68fd51d2ccc9072"
+      }
+    },
+    {
+      "name": "swiftui-expert",
+      "description": "Re-exported and pinned: AvdLee/SwiftUI-Agent-Skill - expert SwiftUI guidance for state, composition, performance, and Liquid Glass. A vibe-swift dependency.",
+      "source": {
+        "source": "github",
+        "repo": "AvdLee/SwiftUI-Agent-Skill",
+        "ref": "4.0.0",
+        "sha": "65118ba010cbfcd4b985a4c83e29c74f37d1c1f1"
+      }
+    },
+    {
+      "name": "swift-testing-expert",
+      "description": "Re-exported and pinned: AvdLee/Swift-Testing-Agent-Skill - expert Swift Testing guidance (#expect/#require, traits, parameterization, XCTest migration). A vibe-swift dependency.",
+      "source": {
+        "source": "github",
+        "repo": "AvdLee/Swift-Testing-Agent-Skill",
+        "ref": "1.2.0",
+        "sha": "798e9b1a2bcac164d4f0c781908199e754f0bab6"
+      }
     }
   ]
 }

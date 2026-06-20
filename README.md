@@ -39,6 +39,21 @@ The orchestration engine. Pure process — no framework knowledge.
 | `vibe:profile-policy` | Hidden knowledge skill: how model routing works — the PROFILE tiers and the one global Opus↔Fable switch. |
 | `vibe:fable-safe-authoring` | Hidden knowledge skill: authoring constraints so every skill/command/agent runs well on frontier models and never silently falls back. |
 
+### `vibe-swift` — Swift / macOS overlay
+
+The first stack overlay. Enable it (via `/vibe:setup` or `.claude/settings.json`) when scaffolding or building a Swift / macOS project.
+
+| Component | What it is |
+|---|---|
+| `vibe-swift:swift-concurrency` | Reviews concurrency under Swift 6 mode + Approachable Concurrency — actor isolation, `Sendable`, safe async boundaries. |
+| `vibe-swift:swift-testability` | Reviews the single-source-of-truth + injected-protocol pattern that makes logic unit-testable without real system APIs. |
+| `vibe-swift:swift-signing` | Pre-flights Developer ID signing, notarization, and Sparkle auto-update before a release. |
+| `vibe-swift:swift-scaffold` | Hidden knowledge skill: the canonical macOS project shape (single-target SwiftUI, `@Observable` source of truth, Swift Testing, Developer ID + Sparkle release pipeline), with testability and distribution references. |
+
+Depends on the re-exported `swiftui-expert` and `swift-testing-expert` skills.
+
+**Third-party, re-exported and pinned by `ref` + `sha`:** `superpowers` (the phase engine `vibe` wraps), `swiftui-expert`, and `swift-testing-expert`. One review/update point — bump the pins in this marketplace.
+
 ## The build pipeline
 
 `vibe:conduct` wraps [superpowers](https://github.com/obra/superpowers) as the phase engine and layers on three distinctives it doesn't provide: model-tiering by task, review of every diff, and an independent fresh-context verifier as a separate final pass.
@@ -66,10 +81,10 @@ Claude Code **2.1.154+** for the full feature set used here: dependency version 
 
 ## Development
 
-The marketplace is Markdown + JSON; the `tools/` sidecar is Bun + TypeScript (Bun always — never npm/yarn/pnpm). Run `bun install`, then `bun test` and `bun run typecheck`. Validate manifests with `claude plugin validate . --strict` and `claude plugin validate ./plugins/vibe --strict`.
+The marketplace is Markdown + JSON; the `tools/` sidecar is Bun + TypeScript (Bun always — never npm/yarn/pnpm). Run `bun install`, then `bun test` and `bun run typecheck`. Validate manifests with `claude plugin validate . --strict` (and per-plugin, e.g. `claude plugin validate ./plugins/vibe --strict`). Cut a release with `bun tools/release.ts <plugin-dir>` (dry-run by default; `--yes` to publish).
 
 ## Status
 
-Built and validated: the marketplace skeleton, the `vibe` core orchestration engine (`conduct` + the doer/reviewer/verifier agents + the `clarify`/`profile-policy`/`fable-safe-authoring` skills), `/vibe:setup` (brief-driven scaffolder), and the Bun/TypeScript tooling sidecar.
+Built and validated: the marketplace skeleton; the `vibe` core (`conduct` + the doer/reviewer/verifier agents + the `clarify`/`profile-policy`/`fable-safe-authoring` skills); `/vibe:setup`; the `vibe-swift` overlay (Swift concurrency/testability/signing guardians + the `swift-scaffold` knowledge); the three `ref`+`sha` re-exports (`superpowers`, `swiftui-expert`, `swift-testing-expert`); and the Bun/TypeScript sidecar (settings/version/notes pure functions under test, plus the per-plugin `release.ts`).
 
-Planned: `/vibe:brainstorm`, the `/vibe:review` · `/vibe:commit` · `/vibe:fix` · `/vibe:quick-check` suite, the `vibe-swift` overlay with pinned third-party expert skills, and the release pipeline (version bump + tag + GitHub release).
+Planned: `/vibe:brainstorm` and the `/vibe:review` · `/vibe:commit` · `/vibe:fix` · `/vibe:quick-check` suite; proving the overlay end-to-end on a real macOS project.
