@@ -86,7 +86,7 @@ Claude Code **2.1.143+** — for the plugin dependency cascade: enabling a plugi
 
 ## Development
 
-The marketplace is Markdown + JSON; the `tools/` sidecar is Bun + TypeScript (Bun always — never npm/yarn/pnpm). Run `bun install`, then `bun test` and `bun run typecheck`. Validate manifests with `claude plugin validate . --strict` (and per-plugin, e.g. `claude plugin validate ./plugins/vibe --strict`). Cut a release with `bun tools/release.ts <plugin-dir>` (interactive; `--dry-run` to preview, `--yes` for CI). Check or bump the pinned third-party re-exports with `bun tools/pins.ts` (interactive; `--dry-run` to only report drift). Both use clack prompts.
+The marketplace is Markdown + JSON; the `tools/` sidecar is Bun + TypeScript (Bun always — never npm/yarn/pnpm). Run `bun install`, then `bun test` and `bun run typecheck`. Validate manifests with `claude plugin validate . --strict` (and per-plugin, e.g. `claude plugin validate ./plugins/vibe --strict`). Cut a release with `bun release plugins/vibe` — or just `bun release` to pick the plugin interactively (`--dry-run` to preview, `--yes` for CI). Check or bump the pinned third-party re-exports with `bun tools/pins.ts` (interactive; `--dry-run` to only report drift). Both use clack prompts.
 
 ## Status
 

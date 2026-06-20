@@ -7,6 +7,7 @@
  * release via `claude plugin tag` (which validates plugin.json <-> marketplace
  * agreement and a clean tree), and publishes a GitHub Release.
  *
+ *   bun tools/release.ts                         interactive: pick the plugin, then the bump
  *   bun tools/release.ts <plugin-dir>            interactive: pick the bump, confirm
  *   bun tools/release.ts <plugin-dir> --dry-run  show the plan, change nothing
  *   bun tools/release.ts <plugin-dir> --yes      non-interactive (CI): ship the suggested bump
@@ -16,7 +17,7 @@
  * functions in version.ts / notes.ts.
  */
 import { spawnSync } from "node:child_process";
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import * as p from "@clack/prompts";
@@ -41,17 +42,64 @@ function exec(cmd: string, cmdArgs: string[]): string {
   return (r.stdout || "").trim();
 }
 
+/** Plugin dirs under plugins/ that carry a manifest, for the interactive picker. */
+function discoverPlugins(): { dir: string; name: string; version: string }[] {
+  const root = join(ROOT, "plugins");
+  if (!existsSync(root)) {
+    return [];
+  }
+  const out: { dir: string; name: string; version: string }[] = [];
+  for (const entry of readdirSync(root, { withFileTypes: true })) {
+    if (!entry.isDirectory()) {
+      continue;
+    }
+    const manifestPath = join(root, entry.name, ".claude-plugin", "plugin.json");
+    if (!existsSync(manifestPath)) {
+      continue;
+    }
+    const m = JSON.parse(readFileSync(manifestPath, "utf8")) as { name?: string; version?: string };
+    out.push({
+      dir: `plugins/${entry.name}`,
+      name: m.name ?? entry.name,
+      version: normalize(m.version ?? "0.0.0"),
+    });
+  }
+  return out;
+}
+
 async function main() {
   const args = process.argv.slice(2);
   const DRY_RUN = args.includes("--dry-run");
   const YES = args.includes("--yes") || args.includes("-y");
-  const pluginDir = args.find((a) => !a.startsWith("-"));
+  let pluginDir = args.find((a) => !a.startsWith("-"));
 
   p.intro(DRY_RUN ? "VIBE release (dry run)" : "VIBE release");
 
   if (!pluginDir) {
-    p.cancel("usage: bun tools/release.ts <plugin-dir> [--dry-run] [--yes]");
-    process.exit(1);
+    // No plugin named — prompt for it. In CI (--yes) or a non-interactive shell
+    // there's nothing to prompt on, so show usage and stop.
+    if (YES || !process.stdin.isTTY) {
+      p.cancel("usage: bun tools/release.ts <plugin-dir> [--dry-run] [--yes]");
+      process.exit(1);
+    }
+    const plugins = discoverPlugins();
+    if (plugins.length === 0) {
+      p.cancel("No plugins found under plugins/.");
+      process.exit(1);
+    }
+    const picked = await p.select({
+      message: "Which plugin do you want to release?",
+      options: plugins.map((pl) => ({
+        value: pl.dir,
+        label: `${pl.name}  v${pl.version}`,
+        hint: pl.dir,
+      })),
+    });
+    if (p.isCancel(picked)) {
+      p.cancel("Cancelled.");
+      process.exit(0);
+    }
+    pluginDir = picked;
   }
 
   const manifestPath = join(ROOT, pluginDir, ".claude-plugin", "plugin.json");
