@@ -7,9 +7,9 @@
  * release via `claude plugin tag` (which validates plugin.json <-> marketplace
  * agreement and a clean tree), and publishes a GitHub Release.
  *
- * Dependency-free and flag-driven (CI-friendly):
- *   bun tools/release.ts <plugin-dir>          dry run (default): show the plan
- *   bun tools/release.ts <plugin-dir> --yes    execute: bump, commit, tag, release
+ *   bun tools/release.ts <plugin-dir>            interactive: pick the bump, confirm
+ *   bun tools/release.ts <plugin-dir> --dry-run  show the plan, change nothing
+ *   bun tools/release.ts <plugin-dir> --yes      non-interactive (CI): ship the suggested bump
  *
  * Versions live in each plugin's plugin.json; the tag scheme is
  * {plugin-name}--v{version}. The version math + notes are the tested pure
@@ -19,18 +19,12 @@ import { spawnSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { bumpVersion, detectBump, normalize } from "./version";
+import * as p from "@clack/prompts";
+
+import { bumpVersion, detectBump, normalize, type BumpLevel } from "./version";
 import { releaseNotes } from "./notes";
 
 const ROOT = join(import.meta.dir, "..");
-const args = process.argv.slice(2);
-const EXECUTE = args.includes("--yes") || args.includes("-y");
-const pluginDir = args.find((a) => !a.startsWith("-"));
-
-if (!pluginDir) {
-  console.error("usage: bun tools/release.ts <plugin-dir> [--yes]");
-  process.exit(1);
-}
 
 /** Run a command, capture trimmed stdout; "" on non-zero exit. */
 function capture(cmd: string, cmdArgs: string[]): string {
@@ -38,84 +32,132 @@ function capture(cmd: string, cmdArgs: string[]): string {
   return r.status === 0 ? (r.stdout || "").trim() : "";
 }
 
-/** Run a command inheriting stdio; throw on non-zero exit. */
-function exec(cmd: string, cmdArgs: string[]): void {
-  const r = spawnSync(cmd, cmdArgs, { cwd: ROOT, stdio: "inherit" });
+/** Run a command, capture output, throw with stderr on non-zero exit (keeps the clack UI clean). */
+function exec(cmd: string, cmdArgs: string[]): string {
+  const r = spawnSync(cmd, cmdArgs, { cwd: ROOT, encoding: "utf8" });
   if (r.status !== 0) {
-    throw new Error(`${cmd} ${cmdArgs.join(" ")} exited ${r.status}`);
+    throw new Error(`${cmd} ${cmdArgs.join(" ")} failed:\n${r.stderr || r.stdout || ""}`);
   }
+  return (r.stdout || "").trim();
 }
 
-const manifestPath = join(ROOT, pluginDir, ".claude-plugin", "plugin.json");
-const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as {
-  name: string;
-  version?: string;
-};
-const name = manifest.name;
-const currentVersion = normalize(manifest.version ?? "0.0.0");
+async function main() {
+  const args = process.argv.slice(2);
+  const DRY_RUN = args.includes("--dry-run");
+  const YES = args.includes("--yes") || args.includes("-y");
+  const pluginDir = args.find((a) => !a.startsWith("-"));
 
-const latestTag =
-  capture("git", ["tag", "-l", `${name}--v*`, "--sort=-v:refname"])
-    .split("\n")
-    .filter(Boolean)[0] ?? "";
-const latestVersion = latestTag ? latestTag.slice(`${name}--v`.length) : "";
+  p.intro(DRY_RUN ? "VIBE release (dry run)" : "VIBE release");
 
-const range = latestTag ? `${latestTag}..HEAD` : "HEAD";
-const log = capture("git", ["log", range, "--format=%s", "--no-merges"]);
-const messages = log ? log.split("\n").filter(Boolean) : [];
-
-const bump = detectBump(messages);
-// First release ships the plugin.json version as-is; later releases bump from the tag.
-const target = latestTag ? bumpVersion(latestVersion, bump) : currentVersion;
-const tag = `${name}--v${target}`;
-const notes = releaseNotes(messages);
-
-console.log(`Plugin:   ${name}`);
-console.log(
-  `Current:  ${latestTag ? `${latestVersion} (tag ${latestTag})` : `${currentVersion} (no release tag yet)`}`,
-);
-console.log(`Commits:  ${messages.length} since ${latestTag || "the beginning"}`);
-console.log(`Bump:     ${latestTag ? bump : "none (first release)"}`);
-console.log(`Next:     ${target}  ->  tag ${tag}`);
-console.log(`\nNotes:\n${notes}\n`);
-
-if (!EXECUTE) {
-  console.log("Dry run. Re-run with --yes to bump plugin.json, tag, and publish.");
-  process.exit(0);
-}
-
-if (capture("git", ["status", "--porcelain"])) {
-  console.error("Working tree is dirty — commit or stash first.");
-  process.exit(1);
-}
-
-const hasRemote = Boolean(capture("git", ["remote"]));
-
-if (target !== manifest.version) {
-  manifest.version = target;
-  writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
-  exec("git", ["add", manifestPath]);
-  exec("git", ["commit", "-m", `chore(release): ${tag}`]);
-}
-
-// Validate plugin.json <-> marketplace agreement + clean tree and create the
-// {name}--v{version} tag LOCALLY first, so a validation failure can't leave a
-// pushed bump commit behind on the remote.
-exec("claude", ["plugin", "tag", pluginDir]);
-
-if (hasRemote) {
-  exec("git", ["push", "origin", "HEAD"]);
-  exec("git", ["push", "origin", tag]);
-
-  const gh = spawnSync(
-    "gh",
-    ["release", "create", tag, "--title", tag, "--notes", notes],
-    { cwd: ROOT, stdio: "inherit" },
-  );
-  if (gh.status !== 0) {
-    console.error(`Tag ${tag} created and pushed, but \`gh release create\` failed (is gh authenticated?).`);
+  if (!pluginDir) {
+    p.cancel("usage: bun tools/release.ts <plugin-dir> [--dry-run] [--yes]");
     process.exit(1);
   }
+
+  const manifestPath = join(ROOT, pluginDir, ".claude-plugin", "plugin.json");
+  const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as { name: string; version?: string };
+  const name = manifest.name;
+  const currentVersion = normalize(manifest.version ?? "0.0.0");
+
+  const latestTag =
+    capture("git", ["tag", "-l", `${name}--v*`, "--sort=-v:refname"]).split("\n").filter(Boolean)[0] ?? "";
+  const latestVersion = latestTag ? latestTag.slice(`${name}--v`.length) : "";
+
+  const range = latestTag ? `${latestTag}..HEAD` : "HEAD";
+  const log = capture("git", ["log", range, "--format=%s", "--no-merges"]);
+  const messages = log ? log.split("\n").filter(Boolean) : [];
+
+  p.note(
+    messages.length ? messages.map((m) => `  ${m}`).join("\n") : "  (none)",
+    `${messages.length} commit(s) since ${latestTag || "the beginning"}`,
+  );
+
+  const base = latestTag ? latestVersion : currentVersion;
+  const detected = detectBump(messages);
+  // First release ships the plugin.json version as-is; later releases bump from the tag.
+  let target = latestTag ? bumpVersion(base, detected) : currentVersion;
+
+  if (!DRY_RUN && !YES) {
+    type Choice = BumpLevel | "current";
+    const levels: BumpLevel[] = ["patch", "minor", "major"];
+    const options: { value: Choice; label: string }[] = levels.map((l) => ({
+      value: l,
+      label: `${l} -> v${bumpVersion(base, l)}${detected === l && latestTag ? "  (suggested)" : ""}`,
+    }));
+    if (!latestTag) {
+      options.unshift({ value: "current", label: `v${currentVersion}  (ship as-is)` });
+    }
+    const picked = await p.select<Choice>({
+      message: `What kind of release is this? (current v${base})`,
+      options,
+      initialValue: latestTag ? detected : "current",
+    });
+    if (p.isCancel(picked)) {
+      p.cancel("Cancelled.");
+      process.exit(0);
+    }
+    target = picked === "current" ? currentVersion : bumpVersion(base, picked);
+  }
+
+  const tag = `${name}--v${target}`;
+  const notes = releaseNotes(messages);
+  p.note(`${tag}\n\n${notes}`, "Release preview");
+
+  if (DRY_RUN) {
+    p.outro(`Dry run — would ship ${name} as ${tag}. Re-run without --dry-run to publish.`);
+    return;
+  }
+
+  if (!YES) {
+    const ok = await p.confirm({ message: `Publish ${tag}? Tags the commit and creates the GitHub Release.` });
+    if (p.isCancel(ok) || !ok) {
+      p.cancel("Cancelled.");
+      process.exit(0);
+    }
+  }
+
+  if (capture("git", ["status", "--porcelain"])) {
+    p.cancel("Working tree is dirty — commit or stash first.");
+    process.exit(1);
+  }
+
+  const hasRemote = Boolean(capture("git", ["remote"]));
+
+  if (target !== manifest.version) {
+    manifest.version = target;
+    writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+    exec("git", ["add", manifestPath]);
+    exec("git", ["commit", "-m", `chore(release): ${tag}`]);
+    p.log.success(`Bumped ${name} to ${target}.`);
+  }
+
+  // Validate plugin.json <-> marketplace agreement + clean tree and create the
+  // {name}--v{version} tag LOCALLY first, so a validation failure can't leave a
+  // pushed bump commit behind on the remote.
+  exec("claude", ["plugin", "tag", pluginDir]);
+  p.log.success(`Tagged ${tag}.`);
+
+  if (hasRemote) {
+    exec("git", ["push", "origin", "HEAD"]);
+    exec("git", ["push", "origin", tag]);
+    p.log.success("Pushed commit and tag.");
+
+    const gh = spawnSync("gh", ["release", "create", tag, "--title", tag, "--notes", notes], {
+      cwd: ROOT,
+      encoding: "utf8",
+    });
+    if (gh.status !== 0) {
+      p.cancel(`Tag ${tag} pushed, but \`gh release create\` failed (is gh authenticated?).`);
+      process.exit(1);
+    }
+  }
+
+  p.outro(`Shipped ${tag}${hasRemote ? "" : " (local tag only - no git remote)"}.`);
 }
 
-console.log(`\nShipped ${tag}${hasRemote ? "" : " (local tag only - no git remote)"}.`);
+if (import.meta.main) {
+  main().catch((e) => {
+    p.cancel((e as Error).message);
+    process.exit(1);
+  });
+}

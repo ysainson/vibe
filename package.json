@@ -6,10 +6,14 @@
   "scripts": {
     "test": "bun test",
     "typecheck": "tsc --noEmit",
-    "release": "bun tools/release.ts"
+    "release": "bun tools/release.ts",
+    "pins": "bun tools/pins.ts"
   },
   "devDependencies": {
     "@types/bun": "latest",
     "typescript": "latest"
+  },
+  "dependencies": {
+    "@clack/prompts": "^1.6.0"
   }
 }
