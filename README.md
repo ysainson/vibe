@@ -28,7 +28,12 @@ The orchestration engine. Pure process — no framework knowledge.
 | Component | What it is |
 |---|---|
 | `/vibe:setup` | Brief-driven scaffolder: reads a project brief, asks only the gaps via `vibe:clarify`, detects the stack, scaffolds the skeleton + tooling baseline + `CLAUDE.md` (not features), and writes `.claude/settings.json` enabling the VIBE core and the matching stack overlay. User-only (`disable-model-invocation: true`). |
+| `/vibe:brainstorm` | Turn an idea into a written spec in `docs/specs/` — wraps superpowers' `brainstorming` and applies VIBE's heuristics (two-phase build for visual-hero apps; numbered, test-first, commit-per-task plans). User-only. |
 | `/vibe:conduct` | Orchestrated coding flow: the session model plans, writes a failing test contract, lays out a numbered commit-per-task plan, delegates implementation to model-tiered doer subagents, reviews **every** diff in two passes, and gates completion through an independent fresh-context verifier. A thin command wrapper over the `conduct` skill — commands display namespaced (`/vibe:*`) in autocomplete while the backing skill carries `user-invocable: false` to stay model-invocable without a duplicate menu entry. |
+| `/vibe:review` | Comprehensive review of changed files — `reviewer-quality` + `security-verifier`, the enabled overlay's guardians (by file type), and any project-local `.claude/agents/`, plus a CLAUDE.md convention check. |
+| `/vibe:commit` | Conventional commit message from the diff → clipboard. User-only. |
+| `/vibe:fix` | Auto-fix only safe, mechanical issues (formatters/linters + project-local fixers); never security or behavior. User-only. |
+| `/vibe:quick-check` | Fast pre-commit sanity check on changed files — secrets scan + the overlay's quick guardians + project-local lightweight checks. |
 | `vibe:doer` | Implementation subagent (Sonnet by default). |
 | `vibe:doer-mechanical` | Mechanical-edit subagent (Haiku by default) — renames, codemods, boilerplate. |
 | `vibe:reviewer-spec` | Review pass 1: spec compliance — does the diff meet the contract, nothing gamed? |
@@ -85,6 +90,6 @@ The marketplace is Markdown + JSON; the `tools/` sidecar is Bun + TypeScript (Bu
 
 ## Status
 
-Built and validated: the marketplace skeleton; the `vibe` core (`conduct` + the doer/reviewer/verifier agents + the `clarify`/`profile-policy`/`fable-safe-authoring` skills); `/vibe:setup`; the `vibe-swift` overlay (Swift concurrency/testability/signing guardians + the `swift-scaffold` knowledge); the three `ref`+`sha` re-exports (`superpowers`, `swiftui-expert`, `swift-testing-expert`); and the Bun/TypeScript sidecar (settings/version/notes pure functions under test, plus the per-plugin `release.ts`).
+Built and validated — the full v1 surface: the marketplace; the `vibe` core (`conduct` engine + the doer/reviewer/verifier agents + the `clarify`/`profile-policy`/`fable-safe-authoring` skills); the command suite `/vibe:setup` · `/vibe:brainstorm` · `/vibe:conduct` · `/vibe:review` · `/vibe:commit` · `/vibe:fix` · `/vibe:quick-check`; the `vibe-swift` overlay (Swift concurrency/testability/signing guardians + the `swift-scaffold` knowledge); the three `ref`+`sha` re-exports (`superpowers`, `swiftui-expert`, `swift-testing-expert`); and the Bun/TypeScript sidecar (settings/version/notes pure functions under test, plus `release.ts` and `pins.ts`).
 
-Planned: `/vibe:brainstorm` and the `/vibe:review` · `/vibe:commit` · `/vibe:fix` · `/vibe:quick-check` suite; proving the overlay end-to-end on a real macOS project.
+Next: prove the overlay end-to-end on a real macOS project (the Claude-usage tracker), then tag the first marketplace release.
