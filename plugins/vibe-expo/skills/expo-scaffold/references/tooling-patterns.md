@@ -179,7 +179,7 @@ Done-signal: `bun run test` is green.
 
 ## ESLint flat config — the two bans
 
-`bun add -d eslint eslint-config-expo` (the template ships neither). `eslint-config-expo` supplies the base (JSX/TS, platform globals, the `react-hooks` v7 preset that carries the React Compiler rules). Compose the two project bans on top. The `runOnJS` ban is `no-restricted-imports`; the raw-`process.env` ban is `no-restricted-syntax` with an override for the two build-time config files.
+`bun add -d eslint@^9 eslint-config-expo` (the template ships neither). The eslint major is deliberately pinned: `eslint-config-expo`'s transitive `eslint-plugin-react` gates which eslint majors work (bare `eslint` resolves a newer major that crashes lint) — re-verify the supported major at scaffold time. `eslint-config-expo` supplies the base (JSX/TS, platform globals, the `react-hooks` v7 preset that carries the React Compiler rules). Compose the two project bans on top. The `runOnJS` ban is `no-restricted-imports`; the raw-`process.env` ban is `no-restricted-syntax` with an override for the two build-time config files.
 
 ```js
 // eslint.config.js
