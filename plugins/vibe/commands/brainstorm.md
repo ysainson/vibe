@@ -19,4 +19,4 @@ Turn the idea in `$ARGUMENTS` (ask for it if empty) into a durable spec. The `br
   - For a visual-hero app (the look *is* the product), propose a **two-phase build** — a native sandbox to nail the look first, then integration — and validate the visual before layering features.
   - Shape the build as numbered, **test-first, commit-per-task** steps, so `/vibe:conduct` can pick it up directly.
 
-The spec is the deliverable, not code. End by pointing the user at `/vibe:setup <spec>` for a new project, or `/vibe:conduct` inside an existing one.
+The spec is the deliverable, not code. End by pointing the user at `/vibe:setup <spec>` for a new project, or `/vibe:review-plan <spec>` to harden the spec before `/vibe:conduct` builds it.
