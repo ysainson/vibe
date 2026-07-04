@@ -150,7 +150,7 @@ Done-signal: the root layout nests those three providers in that order and expor
 
 ## Example test — jest-expo + @testing-library/react-native
 
-`bunx expo install jest-expo jest @types/jest --dev` and `bun add -d @testing-library/react-native`. The preset maps the tsconfig `@/*` alias into jest's module resolution itself — no `moduleNameMapper` needed. Preset in `package.json`:
+`bunx expo install jest-expo jest @types/jest --dev` and `bun add -d @testing-library/react-native`. The preset maps the tsconfig `@/*` alias into jest's module resolution itself — no `moduleNameMapper` needed. Two wiring facts the defaults don't cover: jest's globals (`describe`/`it`/`expect`) are not auto-included under `expo/tsconfig.base`, so add `"types": ["jest"]` to `tsconfig.json`'s `compilerOptions` when installing; and `renderHook` (testing-library v14+) is async — `await` it.
 
 ```jsonc
 // package.json
@@ -167,8 +167,8 @@ import { renderHook } from "@testing-library/react-native";
 import { useDS } from "@/ds";
 
 describe("useDS", () => {
-  it("exposes the token scales", () => {
-    const { result } = renderHook(() => useDS());
+  it("exposes the token scales", async () => {
+    const { result } = await renderHook(() => useDS());
     expect(result.current.space.md).toBe(16);
     expect(result.current.color.accent).toBeDefined();
   });
