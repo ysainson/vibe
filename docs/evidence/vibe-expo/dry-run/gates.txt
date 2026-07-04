@@ -1,0 +1,31 @@
+=== bun run typecheck ===
+$ tsc --noEmit
+
+=== bun run test ===
+$ jest
+PASS src/ds/__tests__/useDS.test.tsx
+  useDS
+    ✓ exposes the token scales (9 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       1 passed, 1 total
+Snapshots:   0 total
+Time:        0.276 s, estimated 1 s
+Ran all test suites.
+
+=== bun run lint ===
+$ expo lint
+
+=== bunx prettier --check . (scaffold + own config; excludes argent-vendored dirs .agents/.cursor/.gemini/.codex and its generated .mcp.json / .vscode/mcp.json, which are third-party vendored content from 'argent init -y', not scaffold source) ===
+Checking formatting...
+All matched files use Prettier code style!
+
+=== NOTE: a fully unscoped 'bunx prettier --check .' (i.e. including argent's vendored dirs) additionally flags: ===
+[warn] .agents/skills/argent-device-interact/references/gesture-examples.md
+[warn] .agents/skills/argent-device-interact/SKILL.md
+[warn] .agents/skills/argent-react-native-profiler/references/diagnostic-tools.md
+[warn] .cursor/mcp.json
+[warn] .gemini/settings.json
+[warn] .mcp.json
+[warn] .vscode/mcp.json
+[warn] Code style issues found in 7 files. Run Prettier with --write to fix.

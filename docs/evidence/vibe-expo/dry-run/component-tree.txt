@@ -1,0 +1,5 @@
+device: iPhone 17 Pro | app: com.acme.myapp.development (iPhone 17 Pro) | udid: ca4df0d23f9735f8f8d2d0bfb5570da92198d9fd
+Screen: 402x874
+
+SafeAreaView (tap: 0.50,0.57)
+  Text "Hello, VIBE" (tap: 0.50,0.55)
