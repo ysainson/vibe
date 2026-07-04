@@ -149,6 +149,34 @@ releases, and `main` as default branch):**
 | software-mansion-labs/skills | marketplace `swmansion`; **single** inline plugin `skills` (whole repo, no plugin.json, and — unlike callstack — no skills enumeration in its entry to copy; task 1 determines whether skills auto-discover from the repo or need explicit paths) | its RN/New-Architecture skills |
 | vercel-labs/agent-skills | **not a Claude marketplace** (skills.sh-style collection; no `.claude-plugin/` anywhere) | the `vercel-react-native-skills` skill |
 
+**Task-1 outcomes (spike run 2026-07-04, full evidence in
+`docs/evidence/vibe-expo/spike.md`):**
+
+- **expo** — PASS. `git-subdir` at `path: plugins/expo` re-confirmed: 18/18 skills + the
+  `expo` MCP server install, cache byte-matches the pinned sha.
+- **callstack** — PASS, but only via `git-subdir` pointed at
+  `path: skills/react-native-best-practices` (1 skill, matches). The spec's assumed shape —
+  pinned `github` source + a top-level `skills` array on our entry — **fails**: the array is
+  silently ignored for a plain `github` source and all 8 repo skills install instead of 1.
+- **swmansion** — PASS via auto-discovery: a plain pinned `github` source (no `skills` array)
+  installs 6 of 7 top-level skill dirs (`expo-horizon, fishjam, radon-mcp,
+  react-native-best-practices, rnrepo, typegpu`; `detour` excluded — its two skills sit one
+  level deeper and auto-discovery only walks one level under `skills/`). Adding an explicit
+  `skills` array changes nothing — same inert-array finding as callstack.
+- **vercel** — PASS, but only via `git-subdir` pointed at `path: skills/react-native-skills`
+  (1 skill, registered as `vercel-react-native-skills` per its `SKILL.md` frontmatter name).
+  The `github` source + `skills` array shape **fails** here too, and worse than a no-op: it
+  installs the unwanted sibling `react-best-practices` (Next.js/web) alongside everything
+  else.
+- **Open questions:** entry-naming freedom — **confirmed**, all three inline re-exports
+  installed cleanly under names we invented, none matching the upstream's own plugin/skill
+  name. swmansion auto-discovery — **confirmed yes**, and it also revealed that a `skills`
+  array on a plain `github`-sourced entry is a no-op across all three inline repos; only
+  `git-subdir`'s `path` actually scopes an install to a subset of a repo.
+- **Net effect on the pin mechanism:** the three inline upstreams (callstack, swmansion,
+  vercel) all get `git-subdir`/plain-`github` entries analogous to expo's, not the
+  `github`-source-plus-`skills`-array shape this section originally assumed.
+
 **Pin mechanism — proven for the plugin.json case:** the documented `git-subdir` source
 (`{"source": "git-subdir", "url": "<owner>/<repo>", "path": "<subdir>", "ref", "sha"}`)
 installs the pinned subdirectory correctly (verified: `path: plugins/expo` resolves the plugin
