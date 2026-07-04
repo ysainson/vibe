@@ -24,6 +24,7 @@ import * as p from "@clack/prompts";
 
 import { bumpVersion, detectBump, normalize, type BumpLevel } from "./version";
 import { releaseNotes } from "./notes";
+import { releaseLogArgs } from "./release-log";
 
 const ROOT = join(import.meta.dir, "..");
 
@@ -112,7 +113,7 @@ async function main() {
   const latestVersion = latestTag ? latestTag.slice(`${name}--v`.length) : "";
 
   const range = latestTag ? `${latestTag}..HEAD` : "HEAD";
-  const log = capture("git", ["log", range, "--format=%s", "--no-merges"]);
+  const log = capture("git", releaseLogArgs(range, pluginDir));
   const messages = log ? log.split("\n").filter(Boolean) : [];
 
   p.note(
