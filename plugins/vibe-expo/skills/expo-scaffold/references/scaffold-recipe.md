@@ -11,6 +11,8 @@ cd myapp
 
 The default template is Expo Router + TypeScript. On SDK 55+ it already lays down a top-level `src/` holding `app/`, `components/`, `constants/`, and `hooks/` — verify where the routes actually landed before moving anything (step 3 is a no-op if they are already under `src/app`).
 
+The template also pre-ships agent files: `CLAUDE.md` (a one-line `@AGENTS.md` include), `AGENTS.md`, and a `.claude/settings.json` enabling Expo's own plugin. **Merge, don't clobber**: extend the existing `CLAUDE.md` and merge the VIBE marketplace + `vibe`/`vibe-expo` entries into the existing `.claude/settings.json`, keeping what the template (and later `argent init`) put there.
+
 ## 2. Reset to a clean slate
 
 The template's `reset-project` script is **interactive** — it prompts whether to keep the starter files. Answer non-interactively so a scripted run never hangs on stdin:
@@ -19,7 +21,7 @@ The template's `reset-project` script is **interactive** — it prompts whether 
 printf 'n\n' | bun run reset-project    # "n" = delete the starter outright
 ```
 
-That deletes the starter `src/` + `scripts/` and writes a fresh minimal `src/app/` (an `index.tsx` + `_layout.tsx`). (Answering `y` instead moves them into `example/` — then `rm -rf example` before proceeding, or its stale `@/…` imports break typecheck.)
+That deletes the starter `src/` + `scripts/` and writes a fresh minimal `src/app/` (an `index.tsx` + `_layout.tsx`). (Answering `y` instead moves them into `example/` — then `rm -rf example` before proceeding, or its stale `@/…` imports break typecheck.) The script deletes itself with `scripts/`, so also drop the now-dangling `"reset-project"` entry from `package.json` scripts.
 
 ## 3. Put the routes under `src/app`
 
@@ -85,6 +87,7 @@ const config: ExpoConfig = {
   version: "1.0.0",
   orientation: "portrait",
   userInterfaceStyle: "automatic",
+  platforms: ["ios"],   // + "android" when Android is selected — omitting the key does NOT exclude web
   ios: {
     supportsTablet: false,
     bundleIdentifier: `com.acme.myapp${suffix}`,
@@ -108,7 +111,7 @@ Done-signal: `bunx expo config --type public` prints the resolved config for the
 
 ## 6. babel / metro — keep the defaults
 
-The generated `babel.config.js` (`babel-preset-expo`) and `metro.config.js` (`@expo/metro-config`) work as-is for a standalone phone app — do not add config you do not need. Touch them only to deviate:
+The current template generates **no** `babel.config.js` or `metro.config.js` at all — the CLI defaults (`babel-preset-expo`, `@expo/metro-config`) apply without a file on disk, and that is the correct standalone-phone-app state. Do not create either file unless deviating:
 
 - **metro** — a monorepo needs `metro.config.js` to watch the workspace root and resolve hoisted `node_modules` (see [tooling-patterns.md](tooling-patterns.md), monorepo escape hatch).
 - **babel** — leave `babel-preset-expo` alone; React Compiler is driven by the `experiments.reactCompiler` config flag, not a hand-added Babel plugin.
@@ -124,14 +127,14 @@ bun remove react-native-web react-dom @expo/metro-runtime   # whichever are pres
 rm -f assets/images/favicon.png
 ```
 
-Also delete the `"web": "expo start --web"` script from `package.json`. Then in `app.config.ts` ensure there is **no** `web` key, **no** `favicon`, and that `platforms` (if present) does not list `"web"` — leave `platforms` off entirely to default to native only. Done-signal: `grep -ri "react-native-web\|react-dom\|favicon\|\"web\"" app.config.ts package.json` returns nothing.
+Also delete the `"web": "expo start --web"` script from `package.json`. Then in `app.config.ts` ensure there is **no** `web` key, **no** `favicon`, and that `platforms` explicitly lists only the selected native platforms (step 5's snippet) — omitting the key resolves to `['ios','android','web']`, so omission does **not** exclude web. Done-signal: `grep -ri "react-native-web\|react-dom\|favicon\|\"web\"" app.config.ts package.json` returns nothing.
 
 ## 8. The platform clarify question and its consequences
 
 Setup asks one Expo-specific question on top of setup.md's gap questions: **iOS-first, or iOS + Android.**
 
-- **iOS-first** — no `android` block in `app.config.ts`; the build/run command is `expo run:ios`; `CLAUDE.md` records iOS only.
-- **iOS + Android** — add an `android` block to `app.config.ts`:
+- **iOS-first** — `platforms: ["ios"]`, no `android` block in `app.config.ts`; the build/run command is `expo run:ios`; `CLAUDE.md` records iOS only.
+- **iOS + Android** — `platforms: ["ios", "android"]` and an `android` block in `app.config.ts`:
 
   ```ts
   android: {

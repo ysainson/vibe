@@ -42,6 +42,8 @@ export const env = createEnv({
 });
 ```
 
+Declare only variables the app actually has values for — `createEnv` validates at import, so a required var with no value crashes the app at startup. `EXPO_PUBLIC_API_URL` above is illustrative; a scaffold with no backend yet starts with just `EXPO_PUBLIC_APP_ENV`.
+
 Done-signal: `import { env } from "@/env"` typechecks; every other module reads config through `env`, never `process.env`.
 
 ## ds/ tokens module — single barrel, plain StyleSheet
