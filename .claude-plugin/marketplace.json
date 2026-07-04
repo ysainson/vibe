@@ -20,7 +20,7 @@
     {
       "name": "vibe-expo",
       "source": "./plugins/vibe-expo",
-      "description": "VIBE overlay for Expo / React Native, phones only: UI-performance, testability, release, and accessibility guardian agents, plus the Expo scaffold knowledge /vibe:setup uses. Depends on the re-exported expo, callstack-react-native, swmansion-react-native, and vercel-react-native skills."
+      "description": "VIBE overlay for Expo / React Native, phones only: UI-performance, testability, release, and accessibility guardian agents, plus the Expo scaffold knowledge /vibe:setup uses. Depends on the re-exported expo, callstack-react-native, swmansion-react-native, and vercel-react-native skills; via the expo dependency it also auto-loads Expo's hosted MCP server (https://mcp.expo.dev/mcp)."
     },
     {
       "name": "superpowers",
