@@ -58,7 +58,21 @@ The first stack overlay. Enable it (via `/vibe:setup` or `.claude/settings.json`
 
 Depends on the re-exported `swiftui-expert` and `swift-testing-expert` skills.
 
-**Third-party, re-exported and pinned by `ref` + `sha`:** `superpowers` (the phase engine `vibe` wraps), `swiftui-expert`, and `swift-testing-expert`. One review/update point — bump the pins in this marketplace.
+### `vibe-expo` — Expo / React Native overlay
+
+Enable it (via `/vibe:setup` or `.claude/settings.json`) when scaffolding or building an Expo / React Native phone app.
+
+| Component | What it is |
+|---|---|
+| `vibe-expo:expo-ui-performance` | Reviews re-render discipline under React Compiler, reanimated/worklets thread correctness, list virtualization, and animation jank sources. |
+| `vibe-expo:expo-testability` | Reviews logic in testable hooks/pure functions, system effects behind injectable seams, and untestable module-scope side effects. |
+| `vibe-expo:expo-release` | Pre-flights app.config.ts / eas.json / config-plugin coherence, prebuild (CNG) safety, and store submission requirements before a release. |
+| `vibe-expo:expo-a11y` | Reviews labels/roles on touchables, dynamic type, contrast against `ds/` tokens, focus order, and reduced-motion handling. |
+| `vibe-expo:expo-scaffold` | Hidden knowledge skill: the canonical phone-only Expo app shape (create-expo-app → reset-project → reshape to `src/app` + `@/*` alias + typed `app.config.ts`, dev client never Expo Go, dayjs/TanStack Query/t3-env baseline, `ds/` tokens, jest-expo, argent-verified). |
+
+Depends on the re-exported `expo`, `callstack-react-native`, `swmansion-react-native`, and `vercel-react-native` skills.
+
+**Third-party, re-exported and pinned by `ref` + `sha`:** `superpowers` (the phase engine `vibe` wraps), `swiftui-expert`, `swift-testing-expert`, `expo`, `callstack-react-native`, `swmansion-react-native`, and `vercel-react-native`. The four vibe-expo re-exports are tagless upstreams with no stable tag to pin, so they're pinned to `main` branch-head shas instead — `bun tools/pins.ts` reports branch-head drift informationally, not as a failure. The `expo` plugin also auto-loads Expo's hosted MCP server (`https://mcp.expo.dev/mcp`). One review/update point — bump the pins in this marketplace.
 
 ## The build pipeline
 
@@ -91,6 +105,6 @@ The marketplace is Markdown + JSON; the `tools/` sidecar is Bun + TypeScript (Bu
 
 ## Status
 
-Built and validated — the full v1 surface: the marketplace; the `vibe` core (`conduct` engine + the doer/reviewer/verifier agents + the `clarify`/`profile-policy`/`fable-safe-authoring` skills); the command suite `/vibe:setup` · `/vibe:brainstorm` · `/vibe:review-plan` · `/vibe:conduct` · `/vibe:review` · `/vibe:commit` · `/vibe:fix` · `/vibe:quick-check`; the `vibe-swift` overlay (Swift concurrency/testability/signing guardians + the `swift-scaffold` knowledge); the three `ref`+`sha` re-exports (`superpowers`, `swiftui-expert`, `swift-testing-expert`); and the Bun/TypeScript sidecar (settings/version/notes pure functions under test, plus `release.ts` and `pins.ts`).
+Built and validated — the full v1 surface: the marketplace; the `vibe` core (`conduct` engine + the doer/reviewer/verifier agents + the `clarify`/`profile-policy`/`fable-safe-authoring` skills); the command suite `/vibe:setup` · `/vibe:brainstorm` · `/vibe:review-plan` · `/vibe:conduct` · `/vibe:review` · `/vibe:commit` · `/vibe:fix` · `/vibe:quick-check`; the `vibe-swift` overlay (Swift concurrency/testability/signing guardians + the `swift-scaffold` knowledge); the `vibe-expo` overlay (Expo UI-performance/testability/release/a11y guardians + the `expo-scaffold` knowledge); the seven `ref`+`sha` re-exports (`superpowers`, `swiftui-expert`, `swift-testing-expert`, `expo`, `callstack-react-native`, `swmansion-react-native`, `vercel-react-native`); and the Bun/TypeScript sidecar (settings/version/notes pure functions under test, plus `release.ts` and `pins.ts`).
 
 Next: prove the overlay end-to-end on a real macOS project (the Claude-usage tracker), then tag the first marketplace release.

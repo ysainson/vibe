@@ -22,6 +22,8 @@ git diff --cached
 
 **Stack overlay (by changed file type):**
 - If `.swift` files changed: `vibe-swift:swift-concurrency` and `vibe-swift:swift-testability`; add `vibe-swift:swift-signing` only when signing, entitlements, or release config changed. Consult the `swiftui-expert-skill` / `swift-testing-expert` skills for specifics.
+- In an Expo project (`expo` present in `package.json` dependencies — file extension alone is not the key, `.ts` is ambiguous), changed `.ts`/`.tsx` files dispatch `vibe-expo:expo-ui-performance` and `vibe-expo:expo-testability`; add `vibe-expo:expo-a11y` when screens or components changed; add `vibe-expo:expo-release` only when app config, eas.json, config plugins, or native modules changed. Consult the `callstack-react-native:react-native-best-practices`, `swmansion-react-native:react-native-best-practices`, `vercel-react-native:vercel-react-native-skills`, and the `expo` plugin's skills for specifics.
+- If the matching overlay plugin isn't installed or enabled, say so in the report and skip its guardians — never dispatch missing agent ids.
 - Other overlays add their guardians here as they ship.
 
 **Project-local (discover, then dispatch what applies):**

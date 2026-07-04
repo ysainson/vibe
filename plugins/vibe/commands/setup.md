@@ -19,7 +19,7 @@ The brief is `$ARGUMENTS` (a path to a brief markdown file). If empty, look for 
    - **Confirm latest versions** — the current-stable versions you resolved for the stack (see the rule below): show them and confirm before scaffolding.
    Skip any the brief already answers.
 
-3. **Detect the stack and pick the overlay.** Map the brief's stack to a VIBE overlay (e.g. Swift / macOS → `vibe-swift`). The core `vibe` is always enabled; add the overlay when one matches. If none fits, enable `vibe` alone and say so.
+3. **Detect the stack and pick the overlay.** Map the brief's stack to a VIBE overlay (e.g. Swift / macOS → `vibe-swift`, Expo / React Native → `vibe-expo`). The core `vibe` is always enabled; add the overlay when one matches. If none fits, enable `vibe` alone and say so.
 
 4. **Scaffold the skeleton — not the features.** Create the minimal project structure for the stack, a tooling baseline (the lint / format / test config that stack expects), `docs/specs/` and `docs/plans/` (the durable trail `/vibe:conduct` writes into), and the project's `CLAUDE.md` (its conventions, the build / test / run commands, and the resolve-latest-versions rule). Keep it buildable and green at the baseline.
 
