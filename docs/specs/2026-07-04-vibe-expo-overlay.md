@@ -162,7 +162,10 @@ releases, and `main` as default branch):**
   installs 6 of 7 top-level skill dirs (`expo-horizon, fishjam, radon-mcp,
   react-native-best-practices, rnrepo, typegpu`; `detour` excluded — its two skills sit one
   level deeper and auto-discovery only walks one level under `skills/`). Adding an explicit
-  `skills` array changes nothing — same inert-array finding as callstack.
+  `skills` array changes nothing — same inert-array finding as callstack. (Task 3 then pinned
+  the deliberately narrower shape instead: `git-subdir` at
+  `path: skills/react-native-best-practices`, 1 skill, probe-verified — the other five
+  auto-discovered skills are unrelated products and would load into every consumer.)
 - **vercel** — PASS, but only via `git-subdir` pointed at `path: skills/react-native-skills`
   (1 skill, registered as `vercel-react-native-skills` per its `SKILL.md` frontmatter name).
   The `github` source + `skills` array shape **fails** here too, and worse than a no-op: it
@@ -177,15 +180,23 @@ releases, and `main` as default branch):**
   vercel) all get `git-subdir`/plain-`github` entries analogous to expo's, not the
   `github`-source-plus-`skills`-array shape this section originally assumed.
 
-**Pin mechanism — proven for the plugin.json case:** the documented `git-subdir` source
-(`{"source": "git-subdir", "url": "<owner>/<repo>", "path": "<subdir>", "ref", "sha"}`)
-installs the pinned subdirectory correctly (verified: `path: plugins/expo` resolves the plugin
-with all 18 skills in an isolated `CLAUDE_CONFIG_DIR`). A `github` source with a bolted-on
-`path` field **silently installs the repo root with zero skills — never use it**, and
-`validate --strict` catches none of this (it passes nonexistent repos, all-zeros shas, and
-unknown source fields; it validates schema only). The open question for task 1 is narrower:
-the re-export shape for the three upstreams **without** a plugin.json — an entry in this
-marketplace declaring the skills inline (the callstack pattern) over a pinned remote source.
+**Pin mechanism — proven.** `git-subdir` (`{"source": "git-subdir", "url": "<owner>/<repo>",
+"path": "<subdir>", "ref", "sha"}`) with `path` pointed directly at a skill's own directory
+(or a plugin-root directory containing `.claude-plugin/plugin.json`, as with `expo`) is the
+**only** mechanism that actually scopes an install to a subset of a repo — confirmed for both
+the plugin.json case (`path: plugins/expo`, 18/18 skills) and the three inline upstreams
+(callstack, swmansion narrowed entry, vercel — each `git-subdir` at the one target skill's
+directory, 1 skill installed, nothing else). A top-level `skills` array on a marketplace entry
+over a plain `github` source is **silently inert**: install still succeeds, but
+`claude plugin details` lists every top-level skill dir the repo auto-discovers, ignoring the
+array entirely (confirmed independently for callstack and vercel — the array neither adds nor
+removes anything). A plain `github` source with no `skills` array **auto-discovers** every
+immediate subdirectory of `skills/` that contains a `SKILL.md`, one level deep only (confirmed
+for swmansion: 6 of 7 top-level dirs register as skills; `detour`'s two skills sit one level
+deeper and are not reached). A `github` source with a bolted-on `path` field **silently installs
+the repo root with zero skills — never use it**, and `validate --strict` catches none of this
+(it passes nonexistent repos, all-zeros shas, and unknown source fields; it validates schema
+only).
 
 Add to `.claude-plugin/marketplace.json`: the `vibe-expo` local entry, plus pinned re-export
 entries ("Re-exported and pinned: <owner>/<repo> - …" description naming vibe-expo as the

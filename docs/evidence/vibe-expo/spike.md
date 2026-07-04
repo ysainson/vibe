@@ -315,3 +315,85 @@ scopes what gets installed.
 - The winning `swmansion-react-native` entry installs 6 skills, some arguably broader than
   strict "New Architecture" (e.g. `typegpu`, `fishjam`). Task 3 should confirm this breadth
   is intended before pinning verbatim.
+
+---
+
+## Task 3 pin probes
+
+**Date:** 2026-07-04 · fresh shas re-fetched at pin time (all four unchanged from the spike —
+same day, no upstream movement): `gh api repos/<owner>/<repo>/commits/main --jq .sha`.
+
+**Narrowing decision (orchestrator, task 3):** `swmansion-react-native` is pinned narrow —
+`git-subdir` at `skills/react-native-best-practices` — instead of the spike's whole-repo
+`github` auto-discovery shape (6 skills). Repo enumeration
+(`gh api repos/software-mansion-labs/skills/contents/skills/react-native-best-practices`)
+confirms the directory holds `README.md`, `SKILL.md`, `references/`; the `SKILL.md`
+frontmatter `name:` is `react-native-best-practices`, matching the oracle. **Result: PASS** —
+no fallback to the whole-repo shape was needed.
+
+Protocol: entries added to the real `.claude-plugin/marketplace.json`, then
+`CLAUDE_CONFIG_DIR=$(mktemp -d)` (scratch, never the real config), `claude plugin marketplace
+add /Users/yannsainson/Projects/personal/vibe`, `claude plugin install <name>@ysainson`,
+`claude plugin details <name>@ysainson`. Scratch dir removed after.
+
+| entry | pinned sha (main, fetched 2026-07-04) |
+|---|---|
+| expo | `e7e81d2964ec8907bc3c2988e3408dc643028f96` |
+| callstack-react-native | `553dccbe87ba678b14e33aedd4dc274f5b92c85a` |
+| swmansion-react-native | `17642737c22758c808004a3d0e64092cf04ae722` |
+| vercel-react-native | `f8a72b9603728bb92a217a879b7e62e43ad76c81` |
+
+### expo@ysainson — PASS
+
+Install exit 0. `claude plugin details expo@ysainson`:
+```
+expo 1.5.1
+Component inventory
+  Skills (18)  add-app-clip, building-native-ui, eas-simulator, eas-update-insights,
+  expo-api-routes, expo-brownfield, expo-cicd-workflows, expo-deployment, expo-dev-client,
+  expo-examples, expo-module, expo-observe, expo-tailwind-setup, expo-ui,
+  native-data-fetching, upgrading-expo, use-dom, web-to-native
+  Agents (0)  Hooks (0)  MCP servers (1)  expo  LSP servers (0)
+```
+18/18 skills + the `expo` MCP server, matching the spike.
+
+### callstack-react-native@ysainson — PASS
+
+Install exit 0. `claude plugin details callstack-react-native@ysainson`:
+```
+callstack-react-native
+Component inventory
+  Skills (1)  react-native-best-practices
+  Agents (0)  Hooks (0)  MCP servers (0)  LSP servers (0)
+```
+Exactly the target skill, nothing else.
+
+### swmansion-react-native@ysainson — PASS (narrowed git-subdir shape)
+
+Install exit 0. `claude plugin details swmansion-react-native@ysainson`:
+```
+swmansion-react-native
+Component inventory
+  Skills (1)  react-native-best-practices
+  Agents (0)  Hooks (0)  MCP servers (0)  LSP servers (0)
+```
+Exactly `react-native-best-practices`, nothing else — the narrowing decision's oracle is met.
+The spike's whole-repo `github` auto-discovery shape (6 skills: `expo-horizon, fishjam,
+radon-mcp, react-native-best-practices, rnrepo, typegpu`) was **not** needed as a fallback.
+
+### vercel-react-native@ysainson — PASS
+
+Install exit 0. `claude plugin details vercel-react-native@ysainson`:
+```
+vercel-react-native
+Component inventory
+  Skills (1)  vercel-react-native-skills
+  Agents (0)  Hooks (0)  MCP servers (0)  LSP servers (0)
+```
+Registered under the `SKILL.md` frontmatter name `vercel-react-native-skills`, matching the
+spike; the sibling `react-best-practices` (Next.js/web) is absent.
+
+**Verdict: all four entries PASS their install probe as pinned in the real
+`.claude-plugin/marketplace.json`.** Gates also green at these pins: `claude plugin validate .
+--strict`, `bun tools/pins.ts --dry-run` (exit 0, all seven pins report `up to date` — no drift,
+since the shas were fetched same-day), `bun test` (39 pass), `bun run typecheck` (clean).

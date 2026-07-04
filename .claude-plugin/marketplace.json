@@ -46,6 +46,50 @@
         "ref": "1.2.0",
         "sha": "798e9b1a2bcac164d4f0c781908199e754f0bab6"
       }
+    },
+    {
+      "name": "expo",
+      "description": "Re-exported and pinned: expo/skills - Official Expo skills for building, deploying, upgrading, and debugging Expo apps. Ships a .mcp.json pointing at the hosted https://mcp.expo.dev/mcp MCP server, which auto-loads for consumers. A vibe-expo dependency.",
+      "source": {
+        "source": "git-subdir",
+        "url": "expo/skills",
+        "path": "plugins/expo",
+        "ref": "main",
+        "sha": "e7e81d2964ec8907bc3c2988e3408dc643028f96"
+      }
+    },
+    {
+      "name": "callstack-react-native",
+      "description": "Re-exported and pinned: callstackincubator/agent-skills - react-native-best-practices (performance: FPS/TTI/bundle/memory). A vibe-expo dependency.",
+      "source": {
+        "source": "git-subdir",
+        "url": "callstackincubator/agent-skills",
+        "path": "skills/react-native-best-practices",
+        "ref": "main",
+        "sha": "553dccbe87ba678b14e33aedd4dc274f5b92c85a"
+      }
+    },
+    {
+      "name": "swmansion-react-native",
+      "description": "Re-exported and pinned: software-mansion-labs/skills - react-native-best-practices (New-Architecture patterns: Reanimated/worklets/Fabric). A vibe-expo dependency.",
+      "source": {
+        "source": "git-subdir",
+        "url": "software-mansion-labs/skills",
+        "path": "skills/react-native-best-practices",
+        "ref": "main",
+        "sha": "17642737c22758c808004a3d0e64092cf04ae722"
+      }
+    },
+    {
+      "name": "vercel-react-native",
+      "description": "Re-exported and pinned: vercel-labs/agent-skills - vercel-react-native-skills (React Native / Expo best practices; not vercel-react-best-practices, which is Next.js/web). A vibe-expo dependency.",
+      "source": {
+        "source": "git-subdir",
+        "url": "vercel-labs/agent-skills",
+        "path": "skills/react-native-skills",
+        "ref": "main",
+        "sha": "f8a72b9603728bb92a217a879b7e62e43ad76c81"
+      }
     }
   ]
 }
