@@ -18,6 +18,11 @@
       "description": "VIBE overlay for Swift / macOS: concurrency, testability, and signing/notarization guardian agents, plus the Swift scaffold knowledge /vibe:setup uses. Depends on the re-exported swiftui-expert and swift-testing-expert skills."
     },
     {
+      "name": "vibe-expo",
+      "source": "./plugins/vibe-expo",
+      "description": "VIBE overlay for Expo / React Native, phones only: UI-performance, testability, release, and accessibility guardian agents, plus the Expo scaffold knowledge /vibe:setup uses. Depends on the re-exported expo, callstack-react-native, swmansion-react-native, and vercel-react-native skills."
+    },
+    {
       "name": "superpowers",
       "description": "Re-exported and pinned: obra/superpowers - the agentic SDLC phase engine the VIBE conduct skill wraps (brainstorming, writing-plans, subagent-driven-development, test-driven-development, code review, finishing-a-development-branch).",
       "source": {

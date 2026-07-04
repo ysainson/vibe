@@ -1,0 +1,14 @@
+{
+  "name": "vibe-expo",
+  "description": "VIBE overlay for Expo / React Native, phones only. Ships UI-performance, testability, release, and accessibility guardian agents and the Expo scaffold knowledge /vibe:setup uses to produce a dev-client-first Expo Router app. Resolves the latest stable Expo SDK and toolchain at scaffold time.",
+  "version": "1.0.0",
+  "author": {
+    "name": "ysainson"
+  },
+  "dependencies": [
+    "expo",
+    "callstack-react-native",
+    "swmansion-react-native",
+    "vercel-react-native"
+  ]
+}
