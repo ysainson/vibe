@@ -1,7 +1,7 @@
 {
   "name": "vibe",
   "description": "The VIBE core: a stack-agnostic orchestration engine. /vibe:conduct builds test-first with model-tiered doers, reviews every diff, and gates completion through an independent fresh-context verifier. Pure process - no framework knowledge.",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "author": {
     "name": "ysainson"
   },
