@@ -21,7 +21,7 @@ Dispatch independent reviewer agents, one per lens, in parallel. Each is a skept
 For a Swift/iOS spec, also route the relevant lens through the `swiftui-expert-skill` / `swift-testing-expert` skills.
 
 ## Step 3 — Independent cross-check (optional)
-For a high-stakes spec, run Codex as a second, different-model reviewer on the same brief: `codex exec -m gpt-5.5 -c model_reasoning_effort=high -c sandbox_mode=read-only -c approval_policy=never - < prompt` (run it in the background, redirect output to a file). On a ChatGPT-account Codex login the codex-family models are rejected — use the general `gpt-5.5`, not a `codex-*` alias. Strong agreement between Codex and the lenses is a high-confidence signal; skip this step for low-stakes specs.
+For a high-stakes spec, run Codex as a second, different-model reviewer on the same brief: `codex exec -m gpt-5.6-sol -c model_reasoning_effort=high -c sandbox_mode=read-only -c approval_policy=never - < prompt` (run it in the background, redirect output to a file). On a ChatGPT-account Codex login the codex-family models are rejected — use the general `gpt-5.6-sol`, not a `codex-*` alias. Strong agreement between Codex and the lenses is a high-confidence signal; skip this step for low-stakes specs.
 
 ## Step 4 — Synthesize
 Dedup the lens (and Codex) findings into one prioritized report: Critical / Major / Minor, each with the spec section, the concrete problem, and a fix. Where lenses disagree, flag it as "verify empirically" rather than picking a side.
