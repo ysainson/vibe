@@ -60,6 +60,45 @@ test("offers the cross-model check as optional", () => {
   expect(body).toContain("optional");
 });
 
+// Cross-check contract (docs/specs/2026-07-17-codex-overlay-and-routing-
+// coverage.md, section C): assert-and-dispatch through the codex plugin's
+// companion script; model choice is config-owned, never named in prose.
+test("cross-check drives the codex plugin companion, not a raw CLI incantation", () => {
+  const body = src();
+  expect(body).toContain("codex-companion.mjs");
+  expect(body).not.toContain("codex exec");
+  expect(body).not.toMatch(/claude-[a-z]+-\d|gpt-\d/);
+});
+
+test("locate resolves the installed plugin, echoing the pick", () => {
+  const body = src();
+  expect(body).toContain("installed_plugins.json");
+  expect(body.toLowerCase()).toMatch(/echo/);
+});
+
+test("asserts readiness and a config-derived model expectation before dispatch", () => {
+  const body = src();
+  expect(body).toContain("setup --json");
+  expect(body.toLowerCase()).toContain("model expectation");
+});
+
+test("dispatches read-only at explicit high effort, in the background, with consent", () => {
+  const body = src();
+  expect(body).toContain("--effort xhigh");
+  expect(body.toLowerCase()).toContain("consent");
+  expect(body.toLowerCase()).toContain("background");
+});
+
+test("collects with a wait budget and a timeout recovery path", () => {
+  const body = src();
+  expect(body).toContain("/codex:status");
+  expect(body.toLowerCase()).toMatch(/wait budget|minutes/);
+});
+
+test("any-stage failure is reported and skipped — the cross-check never blocks the review", () => {
+  expect(src().toLowerCase()).toMatch(/never fails or blocks|never fail|never block/);
+});
+
 test("fable-safe: never asks an agent for introspection", () => {
   expect(src().toLowerCase()).not.toMatch(
     /explain your reasoning|show your work|think out loud/,
