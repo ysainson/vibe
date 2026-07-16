@@ -24,6 +24,30 @@ Report format (your final message is data for the orchestrator, not prose for a 
 4. Concerns or follow-ups.
 ```
 
+## Contract-writer block — include verbatim in every contract-writing dispatch
+
+```text
+Constraints:
+- Touch only test files. Never modify or create implementation files — the exact
+  inverse of the doer's scope.
+- Tests validate the contract and the spec, not an implementation. Write them
+  against what the spec requires, not against code you have not been asked to write.
+- If the contract can't be expressed as a failing test, stop and report why instead
+  of bending it.
+- If you hit ambiguity the spec doesn't resolve, don't decide silently: stop and
+  report — a silently resolved ambiguity hardens into the gate every doer must
+  then satisfy.
+- Before reporting, audit each claim against a tool result from your session. Only
+  report work you can point to evidence for. If tests fail, say so with the output;
+  if a step was skipped, say that. Never report success you haven't observed.
+
+Report format (your final message is data for the orchestrator, not prose for a human):
+1. What changed, by file.
+2. Test/check results, with actual command output.
+3. Deviations from this prompt, and why.
+4. Concerns or follow-ups.
+```
+
 ## Orchestrator notes
 
 - Give the reason, not only the request: doers perform measurably better when the

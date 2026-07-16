@@ -17,7 +17,7 @@ Switch by editing the `PROFILE:` line in `vibe:conduct`. Override for a single r
 
 ## Tiers are aliases, never dated ids
 
-Set each agent's tier through its `model:` frontmatter using an alias — `sonnet`, `haiku`, `opus`, `fable`, or `inherit` (the session model). Never bake a dated id like `claude-opus-4-8` into a role; aliases survive model changes, dated ids rot.
+Set each agent's tier through its `model:` frontmatter using an alias — `sonnet`, `haiku`, `opus`, `fable`, or `inherit` (the session model). Never bake a dated id like `claude-<family>-<n>` into a role; aliases survive model changes, dated ids rot.
 
 ## The one global switch: `CLAUDE_CODE_SUBAGENT_MODEL`
 
@@ -33,3 +33,9 @@ Resolution order (highest priority first):
 Set it to `inherit` for normal resolution (let the lower levels decide). Set it to an alias to force every subagent onto that model regardless of profile or frontmatter.
 
 See `vibe:fable-safe-authoring` for why no role is tied to a model name in prose, and how to keep authored prompts from silently falling back off the model you targeted.
+
+## External cross-check models (Codex) are config-owned
+
+The external cross-check used by `/vibe:review-plan` and `/vibe:review` (Codex, via its CLI) has no alias layer — there's no `sonnet`/`opus`/`fable` tier to route it through. It is **config-owned**: the consumer's own codex config decides the model. Dispatch steps assert readiness and report the config-derived model expectation, but never name a model themselves.
+
+A concrete model name may appear only in setup-layer docs (the README), and only dated to when it was verified.
