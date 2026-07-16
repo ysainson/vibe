@@ -95,6 +95,17 @@
         "ref": "main",
         "sha": "f8a72b9603728bb92a217a879b7e62e43ad76c81"
       }
+    },
+    {
+      "name": "codex",
+      "description": "Re-exported and pinned: openai/codex-plugin-cc - OpenAI's official Codex plugin (managed app-server broker, /codex:review, /codex:adversarial-review, background job control, /codex:setup auth story). Optional cross-model overlay: requires the Codex CLI and an OpenAI login; not a dependency of any VIBE plugin. Ships SessionStart/SessionEnd hooks and a Stop-hook review gate that is OFF by default; VIBE never enables it. Model policy: cross-checks run at the consumer's codex-configured model (VIBE requests high reasoning effort explicitly where the invocation path allows); see README for setup guidance.",
+      "source": {
+        "source": "git-subdir",
+        "url": "openai/codex-plugin-cc",
+        "path": "plugins/codex",
+        "ref": "v1.0.6",
+        "sha": "db52e28f4d9ded852ab3942cea316258ae4ef346"
+      }
     }
   ]
 }
