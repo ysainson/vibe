@@ -37,8 +37,8 @@ test("model expectation on the native-review path derives from review_model firs
 
 test("background launch with a numbered collection step and timeout recovery", () => {
   const body = review().toLowerCase();
-  expect(body).toContain("background");
-  expect(body).toMatch(/collect/);
+  expect(body).toContain("run_in_background");
+  expect(body).toMatch(/## step \d+ — collect/);
   expect(body).toContain("/codex:status");
 });
 

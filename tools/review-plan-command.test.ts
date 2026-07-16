@@ -85,8 +85,13 @@ test("asserts readiness and a config-derived model expectation before dispatch",
 test("dispatches read-only at explicit high effort, in the background, with consent", () => {
   const body = src();
   expect(body).toContain("--effort xhigh");
+  expect(body).toContain("no `--model`");
   expect(body.toLowerCase()).toContain("consent");
   expect(body.toLowerCase()).toContain("background");
+});
+
+test("the report never claims the model that actually ran", () => {
+  expect(src().toLowerCase()).toMatch(/never phrase .* the model that actually ran/);
 });
 
 test("collects with a wait budget and a timeout recovery path", () => {
