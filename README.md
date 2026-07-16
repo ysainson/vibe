@@ -8,10 +8,28 @@ The bet is on process, not a bigger model: tight contracts, staged review, and m
 
 ## Install
 
+The core:
+
 ```
 /plugin marketplace add ysainson/vibe
 /plugin install vibe@ysainson
 ```
+
+Installing `vibe` pulls in `superpowers` automatically (the dependency cascade — see Requirements). Add the overlay for your stack the same way; each pulls its own pinned third-party skills:
+
+```
+/plugin install vibe-swift@ysainson   # Swift / macOS
+/plugin install vibe-expo@ysainson    # Expo / React Native, phones (also auto-loads Expo's hosted MCP server)
+```
+
+Optional — the cross-model check `/vibe:review-plan` and `/vibe:review` can drive (see the `codex` section below for what it sends to OpenAI before installing):
+
+```
+/plugin install codex@ysainson
+/codex:setup
+```
+
+`/codex:setup` checks for the Codex CLI, offers to install it, and walks through `codex login`. Without this plugin the cross-check steps simply report themselves unavailable and skip — nothing else changes.
 
 Local development of the plugins themselves:
 
