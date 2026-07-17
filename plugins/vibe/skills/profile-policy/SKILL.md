@@ -26,7 +26,7 @@ To flip the entire kit to a different model (e.g. Opus 4.8 today → Fable 5 whe
 Resolution order (highest priority first):
 
 1. `CLAUDE_CODE_SUBAGENT_MODEL` env var
-2. the per-invocation model parameter (the PROFILE column applied at dispatch)
+2. the per-invocation model parameter (the PROFILE column applied at dispatch — the Agent tool's `model` param, or the `model` option on a workflow `agent()` call; a workflow call that omits it skips this level entirely)
 3. the agent's `model:` frontmatter
 4. the main conversation model
 
