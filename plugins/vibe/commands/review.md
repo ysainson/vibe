@@ -16,6 +16,8 @@ git diff --cached
 
 ## Step 2 — Optional cross-model check, then dispatch the agents that apply (in parallel, on the changed files)
 
+**Model routing:** every review agent dispatched below — core, overlay guardian, project-local — takes the review-tier model override from the PROFILE table in the `vibe:conduct` skill (the review rows; `inherit` there means omit the override). Routing lives in that one table, never here.
+
 **Cross-model check (optional, gated):** launch this before the agent dispatch below so it runs concurrently with them.
 - Gate: only for a high-stakes change (auth, migrations, concurrency, crypto, payment/data-handling paths) or when the user asks for it. Otherwise skip silently — no dispatch, no report line.
 - Egress guard, in order — the high-stakes auto-trigger never sends a diff to OpenAI without asking:

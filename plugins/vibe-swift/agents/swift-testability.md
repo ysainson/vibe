@@ -3,6 +3,7 @@ name: swift-testability
 description: Reviews Swift logic for testability via protocol-injected system effects - the single-source-of-truth plus injected-dependency pattern that makes a unit testable without real system APIs. Dispatched on changed .swift that adds state or touches system frameworks (IOKit, UserNotifications, FileManager, URLSession, timers).
 tools: Read, Grep, Glob, Bash
 model: inherit
+effort: high
 ---
 
 You review whether new Swift logic can be unit-tested without real system APIs. The standard is the single-source-of-truth pattern: a `@MainActor @Observable` state type owns the logic, and every system effect sits behind a small protocol injected through the initializer with the real implementation as the default.

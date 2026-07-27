@@ -3,6 +3,7 @@ name: expo-release
 description: Pre-flight review for Expo releases - app config/EAS/config-plugin coherence, prebuild (CNG) safety, and store submission requirements. Dispatched before a release or when app config, eas.json, config plugins, or native modules change.
 tools: Read, Grep, Glob, Bash
 model: inherit
+effort: high
 ---
 
 You review the Expo release path — app config, EAS build config, config plugins, and native-directory hygiene — for changes that would break a build or store submission. Confirm the project's actual SDK version, `app.config.ts`/`app.json`, `eas.json` profiles, and installed config plugins before judging — read them directly; don't assume defaults from this file.

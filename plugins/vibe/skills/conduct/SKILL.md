@@ -21,16 +21,17 @@ This flow **wraps [superpowers](https://github.com/obra/superpowers)** — it is
 | Escalation | `vibe:doer` | opus | inherit |
 | Exploration | `Explore` (built-in) | sonnet | inherit |
 | Contract writing | `vibe:contract-writer` | inherit | inherit |
-| Spec-compliance review | `vibe:reviewer-spec` | inherit | inherit |
-| Code-quality review | `vibe:reviewer-quality` | inherit | inherit |
-| Final verification | `vibe:verifier` | inherit | inherit |
-| Security verification | `vibe:security-verifier` | inherit | inherit |
+| Spec-compliance review | `vibe:reviewer-spec` | opus | inherit |
+| Code-quality review | `vibe:reviewer-quality` | opus | inherit |
+| Final verification | `vibe:verifier` | opus | inherit |
+| Security verification | `vibe:security-verifier` | opus | inherit |
+| Overlay guardians & project-local review | *(by stack, discovered at dispatch)* | opus | inherit |
 
-Dispatch each agent with the model override from the active profile column. `inherit` means the session model. The flow is model-agnostic: if the session model changes (Fable 5, Opus 4.8, ...), nothing here changes. Switch `PROFILE` to `uniform` to run every role on the session model — for when cost-tiering isn't wanted or smaller models aren't available. The skill argument overrides the profile for one run (`/vibe:conduct uniform ...`). The policy and the global Opus↔Fable switch live in `vibe:profile-policy`; this table is the operational source.
+Dispatch each agent with the model override from the active profile column. `inherit` means the session model. Effort is not routed here: every agent pins `effort: high` in its own frontmatter, so the session effort setting steers only the orchestrator (see `vibe:profile-policy`). The flow is model-agnostic: if the session model changes (Fable 5, Opus 4.8, ...), nothing here changes. Switch `PROFILE` to `uniform` to run every role on the session model — for when cost-tiering isn't wanted or smaller models aren't available. The skill argument overrides the profile for one run (`/vibe:conduct uniform ...`). The policy and the global Opus↔Fable switch live in `vibe:profile-policy`; this table is the operational source.
 
 The table binds every dispatch mechanism, not just the Agent tool. If any phase runs through the Workflow tool (ultracode, or an explicit workflow request), workflow `agent()` calls inherit the session model unless told otherwise — carry the profile override as each call's `model` option and name the role with `agentType`. Self-check before launching a workflow script: no `agent()` call for a non-`inherit` role omits `model`.
 
-Exploration dispatches (codebase search/summarize fan-outs) take the profile's model as the per-invocation override, exactly like doers; the orchestrator still verifies load-bearing claims itself. Overlay guardians and project-local agents are not in this table — they route by their own `model:` frontmatter (all VIBE-shipped guardians say `inherit`).
+Exploration dispatches (codebase search/summarize fan-outs) take the profile's model as the per-invocation override, exactly like doers; the orchestrator still verifies load-bearing claims itself. Overlay guardians and project-local review agents take the Guardians row's override at dispatch, exactly like the named roles; their `model: inherit` frontmatter is the fallback for dispatches that bypass VIBE's flows. This table also routes the review dispatches in `/vibe:review` and `/vibe:quick-check` — those commands carry the review-tier override too.
 
 Escalation means: a subtask failed two review redirects, or is genuinely hard in isolation (deep debugging, a complex algorithm) and worth a stronger doer from the start.
 

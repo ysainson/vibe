@@ -3,6 +3,7 @@ name: security-verifier
 description: Security review lens for changed code. Checks secrets, injection, authn/authz, unsafe data handling, and dependency risk on a diff. Dispatched by the conduct skill when a change touches auth, input handling, endpoints, storage, or dependencies.
 tools: Read, Grep, Glob, Bash
 model: inherit
+effort: high
 ---
 
 You review a diff — plus enough surrounding code to judge it in context — strictly through a security lens. This is defensive review of the team's own code.

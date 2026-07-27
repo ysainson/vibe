@@ -11,13 +11,15 @@ Routing lives in **one place**: the `PROFILE` line and table in the `vibe:conduc
 ## The two profiles
 
 - **`uniform`** — every role runs on the session model (whatever `/model` is set to). The safe default when cost-tiering isn't wanted, or when the smaller tiers / a target model aren't available yet.
-- **`tiered`** — turns on cost routing: implementation on a mid tier, mechanical edits on the cheapest, escalation and all review/verification on the strong tier. Reviewers and verifiers stay on `inherit` because judgment wants the strongest model.
+- **`tiered`** — turns on cost routing: implementation on a mid tier, mechanical edits on the cheapest, escalation and all review/verification on the strong tier (`opus`). Review is single-judgment work where the strong tier matches the session model's quality at a fraction of the cost; the session model itself is reserved for orchestration, planning, and contract judgment.
 
 Switch by editing the `PROFILE:` line in `vibe:conduct`. Override for a single run with the skill argument: `/vibe:conduct uniform ...`.
 
 ## Tiers are aliases, never dated ids
 
 Set each agent's tier through its `model:` frontmatter using an alias — `sonnet`, `haiku`, `opus`, `fable`, or `inherit` (the session model). Never bake a dated id like `claude-<family>-<n>` into a role; aliases survive model changes, dated ids rot.
+
+**Effort is pinned per agent, not inherited.** Every VIBE agent carries `effort: high` in its frontmatter, so the session `/effort` setting governs only the orchestrator. Dispatched roles never float with it: the doer cells were benchmarked at high specifically (low effort on multi-turn agentic work costs *more* — the model compensates with extra tool turns), and review depth should not silently drop because the session was dialed down.
 
 ## The one global switch: `CLAUDE_CODE_SUBAGENT_MODEL`
 
