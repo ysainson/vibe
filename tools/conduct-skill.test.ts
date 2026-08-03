@@ -63,3 +63,16 @@ test("verify step offers the cross-model check on the final diff — never per-s
 test("no dated model id in the skill (born green — regression guard)", () => {
   expect(skill()).not.toMatch(/claude-[a-z]+-\d|gpt-\d/);
 });
+
+test("skill carries the engineering defaults (born green — regression guard)", () => {
+  const body = skill();
+  expect(body).toContain("## Engineering defaults");
+  expect(body.toLowerCase()).toMatch(/remove obsolete paths/);
+  expect(body.toLowerCase()).toMatch(/consumers outside this codebase/);
+});
+
+test("doer block forbids compat shims and reinvention (born green — regression guard)", () => {
+  const block = guardrails();
+  expect(block).toMatch(/compatibility\s+layers/i);
+  expect(block).toMatch(/dependency already in the\s+project/i);
+});

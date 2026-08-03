@@ -8,6 +8,13 @@ Constraints:
   requires. Do the simplest thing that works well. No error handling, fallbacks, or
   validation for scenarios that cannot happen; validate only at system boundaries
   (user input, external APIs).
+- When your change makes an existing path obsolete, remove it. No compatibility
+  layers, re-export shims, legacy fallbacks, or migration code unless this prompt
+  asks for them — whether anything external still consumes the old path is the
+  orchestrator's call, not yours.
+- Before hand-rolling functionality, check whether a dependency already in the
+  project provides it — read its docs or types rather than assuming it lacks the
+  capability. Never add a new dependency unless this prompt allows it.
 - Never modify test files. If the contract seems wrong or unsatisfiable, stop and
   report why instead of adapting the tests or working around them.
 - If you hit ambiguity this prompt doesn't resolve, don't decide silently: take the

@@ -35,6 +35,16 @@ Exploration dispatches (codebase search/summarize fan-outs) take the profile's m
 
 Escalation means: a subtask failed two review redirects, or is genuinely hard in isolation (deep debugging, a complex algorithm) and worth a stronger doer from the start.
 
+## Engineering defaults
+
+These bind every spec, plan, and dispatch unless the spec explicitly overrides them:
+
+- **Simplest that fully meets the requirement.** No speculative abstraction, configuration, or indirection for needs that do not exist yet.
+- **Long-term by subtraction, not anticipation.** Don't ship a stopgap that is meant to be replaced, and don't build ahead of the requirement — the simple version that will still be right in a year is the architecture.
+- **Grow in layers.** Smallest end-to-end working version first; add each capability on top of a product that already works. Never trade a working product for unfinished complexity.
+- **Remove obsolete paths.** A change that supersedes a path also deletes it, in the same task — no compatibility layers or migrations, except where the old path has consumers outside this codebase (a published API, released plugin versions, persisted data).
+- **Prefer existing capability over new code.** Established, well-maintained libraries — and above all the dependencies already in the project — beat hand-rolled implementations; verify a library's docs or types before concluding it lacks a capability.
+
 ## Flow
 
 1. **Spec.** If the request is underspecified in ways that change the outcome, ask before building — via the AskUserQuestion tool; the `vibe:clarify` skill defines the bar for asking vs proceeding. If a spec already exists under `docs/specs/`, read it and confirm it still holds; otherwise state your assumptions and proceed. Write verifiable success criteria — things a test or command can check.
