@@ -57,6 +57,7 @@ Route to the re-exported expert skills by their **namespaced `plugin:skill` ids*
 - **`callstack-react-native:react-native-best-practices`** — performance: FPS, TTI, bundle size, memory.
 - **`swmansion-react-native:react-native-best-practices`** — New-Architecture patterns: Reanimated, worklets, Fabric.
 - **`vercel-react-native:vercel-react-native-skills`** — React Native / Expo best practices.
+- **`emil-animate-expo:animate-expo`** — Expo animation craft: Reanimated worklets, gesture handoff, springs, haptics.
 
 ## Argent
 

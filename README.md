@@ -22,6 +22,12 @@ Installing `vibe` pulls in `superpowers` automatically (the dependency cascade �
 /plugin install vibe-expo@ysainson    # Expo / React Native, phones (also auto-loads Expo's hosted MCP server)
 ```
 
+Optional — Emil Kowalski's web-focused design-engineering skills, per project where you do web/UI design work (see the `emil-design-eng` section below):
+
+```
+/plugin install emil-design-eng@ysainson
+```
+
 Optional — the cross-model check `/vibe:review-plan` and `/vibe:review` can drive (see the `codex` section below for what it sends to OpenAI before installing):
 
 ```
@@ -88,9 +94,13 @@ Enable it (via `/vibe:setup` or `.claude/settings.json`) when scaffolding or bui
 | `vibe-expo:expo-a11y` | Reviews labels/roles on touchables, dynamic type, contrast against `ds/` tokens, focus order, and reduced-motion handling. |
 | `vibe-expo:expo-scaffold` | Hidden knowledge skill: the canonical phone-only Expo app shape (create-expo-app → reset-project → reshape to `src/app` + `@/*` alias + typed `app.config.ts`, dev client never Expo Go, dayjs/TanStack Query/t3-env baseline, `ds/` tokens, jest-expo, argent-verified). |
 
-Depends on the re-exported `expo`, `callstack-react-native`, `swmansion-react-native`, and `vercel-react-native` skills.
+Depends on the re-exported `expo`, `callstack-react-native`, `swmansion-react-native`, `vercel-react-native`, and `emil-animate-expo` skills.
 
-**Third-party, re-exported and pinned by `ref` + `sha`:** `superpowers` (the phase engine `vibe` wraps), `swiftui-expert`, `swift-testing-expert`, `expo`, `callstack-react-native`, `swmansion-react-native`, `vercel-react-native`, and `codex` (the optional cross-model overlay; see below). The four vibe-expo re-exports are tagless upstreams with no stable tag to pin, so they're pinned to `main` branch-head shas instead — `bun tools/pins.ts` reports branch-head drift informationally, not as a failure. The `expo` plugin also auto-loads Expo's hosted MCP server (`https://mcp.expo.dev/mcp`). One review/update point — bump the pins in this marketplace.
+**Third-party, re-exported and pinned by `ref` + `sha`:** `superpowers` (the phase engine `vibe` wraps), `swiftui-expert`, `swift-testing-expert`, `expo`, `callstack-react-native`, `swmansion-react-native`, `vercel-react-native`, `emil-animate-expo`, `emil-design-eng` (optional; see below), and `codex` (the optional cross-model overlay; see below). The five vibe-expo re-exports and `emil-design-eng` are tagless upstreams with no stable tag to pin, so they're pinned to `main` branch-head shas instead — `bun tools/pins.ts` reports branch-head drift informationally, not as a failure. The `expo` plugin also auto-loads Expo's hosted MCP server (`https://mcp.expo.dev/mcp`). One review/update point — bump the pins in this marketplace.
+
+### `emil-design-eng` — optional design-engineering collection
+
+Re-exports [emilkowalski/skills](https://github.com/emilkowalski/skills) whole — Emil Kowalski's design-engineering skills (animation craft, animation review/improvement audits, Apple-design-for-web, UI library picks, prototyping, Sonner). The collection is web-focused, so it is optional and never auto-installed — no VIBE plugin depends on it; enable it per project where you do web/UI design work (`/plugin install emil-design-eng@ysainson`). The one Expo-native skill in the collection, `animate-expo`, is re-exported separately as `emil-animate-expo` and wired into `vibe-expo` as a dependency, so Expo projects get it automatically without the ten web-focused skills.
 
 ### `codex` — optional cross-model overlay
 
@@ -127,4 +137,4 @@ The marketplace is Markdown + JSON; the `tools/` sidecar is Bun + TypeScript (Bu
 
 ## Status
 
-Built and validated — the full v1 surface: the marketplace; the `vibe` core (`conduct` engine + the doer/reviewer/verifier agents + the `clarify`/`profile-policy`/`fable-safe-authoring` skills); the command suite `/vibe:setup` · `/vibe:brainstorm` · `/vibe:review-plan` · `/vibe:conduct` · `/vibe:review` · `/vibe:commit` · `/vibe:fix` · `/vibe:quick-check`; the `vibe-swift` overlay (Swift concurrency/testability/signing guardians + the `swift-scaffold` knowledge); the `vibe-expo` overlay (Expo UI-performance/testability/release/a11y guardians + the `expo-scaffold` knowledge); the eight `ref`+`sha` re-exports (`superpowers`, `swiftui-expert`, `swift-testing-expert`, `expo`, `callstack-react-native`, `swmansion-react-native`, `vercel-react-native`, `codex`); and the Bun/TypeScript sidecar (settings/version/notes pure functions under test, plus `release.ts` and `pins.ts`).
+Built and validated — the full v1 surface: the marketplace; the `vibe` core (`conduct` engine + the doer/reviewer/verifier agents + the `clarify`/`profile-policy`/`fable-safe-authoring` skills); the command suite `/vibe:setup` · `/vibe:brainstorm` · `/vibe:review-plan` · `/vibe:conduct` · `/vibe:review` · `/vibe:commit` · `/vibe:fix` · `/vibe:quick-check`; the `vibe-swift` overlay (Swift concurrency/testability/signing guardians + the `swift-scaffold` knowledge); the `vibe-expo` overlay (Expo UI-performance/testability/release/a11y guardians + the `expo-scaffold` knowledge); the ten `ref`+`sha` re-exports (`superpowers`, `swiftui-expert`, `swift-testing-expert`, `expo`, `callstack-react-native`, `swmansion-react-native`, `vercel-react-native`, `emil-animate-expo`, `emil-design-eng`, `codex`); and the Bun/TypeScript sidecar (settings/version/notes pure functions under test, plus `release.ts` and `pins.ts`).

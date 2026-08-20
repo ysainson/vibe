@@ -9,6 +9,7 @@
     "expo",
     "callstack-react-native",
     "swmansion-react-native",
-    "vercel-react-native"
+    "vercel-react-native",
+    "emil-animate-expo"
   ]
 }

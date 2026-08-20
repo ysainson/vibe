@@ -20,7 +20,7 @@
     {
       "name": "vibe-expo",
       "source": "./plugins/vibe-expo",
-      "description": "VIBE overlay for Expo / React Native, phones only: UI-performance, testability, release, and accessibility guardian agents, plus the Expo scaffold knowledge /vibe:setup uses. Depends on the re-exported expo, callstack-react-native, swmansion-react-native, and vercel-react-native skills; via the expo dependency it also auto-loads Expo's hosted MCP server (https://mcp.expo.dev/mcp)."
+      "description": "VIBE overlay for Expo / React Native, phones only: UI-performance, testability, release, and accessibility guardian agents, plus the Expo scaffold knowledge /vibe:setup uses. Depends on the re-exported expo, callstack-react-native, swmansion-react-native, vercel-react-native, and emil-animate-expo skills; via the expo dependency it also auto-loads Expo's hosted MCP server (https://mcp.expo.dev/mcp)."
     },
     {
       "name": "superpowers",
@@ -28,8 +28,8 @@
       "source": {
         "source": "github",
         "repo": "obra/superpowers",
-        "ref": "v6.1.1",
-        "sha": "d884ae04edebef577e82ff7c4e143debd0bbec99"
+        "ref": "v6.3.0",
+        "sha": "b36e0829c6d0140e93cfef2ca599b1b07d4a7797"
       }
     },
     {
@@ -38,8 +38,8 @@
       "source": {
         "source": "github",
         "repo": "AvdLee/SwiftUI-Agent-Skill",
-        "ref": "4.0.0",
-        "sha": "65118ba010cbfcd4b985a4c83e29c74f37d1c1f1"
+        "ref": "4.2.0",
+        "sha": "9692ec5c3e78a0acc7757de2dbe8e64e519a72fb"
       }
     },
     {
@@ -60,7 +60,7 @@
         "url": "expo/skills",
         "path": "plugins/expo",
         "ref": "main",
-        "sha": "8d72763f53c4fe11ed3ae0441b921bda821d2a74"
+        "sha": "472d040092900dc8bbf84dc7efb0c90abff77a0d"
       }
     },
     {
@@ -71,7 +71,7 @@
         "url": "callstackincubator/agent-skills",
         "path": "skills/react-native-best-practices",
         "ref": "main",
-        "sha": "f6b87e35a35cc300c71331b89af2ac3d9b48a193"
+        "sha": "2766baa46ca0fe7c16cc5ab4d0077ccec2e95fb9"
       }
     },
     {
@@ -82,7 +82,7 @@
         "url": "software-mansion-labs/skills",
         "path": "skills/react-native-best-practices",
         "ref": "main",
-        "sha": "17642737c22758c808004a3d0e64092cf04ae722"
+        "sha": "16f16b06fc69cd21df36eacb2a80c2111569be24"
       }
     },
     {
@@ -93,7 +93,28 @@
         "url": "vercel-labs/agent-skills",
         "path": "skills/react-native-skills",
         "ref": "main",
-        "sha": "f8a72b9603728bb92a217a879b7e62e43ad76c81"
+        "sha": "b8caa260a420a73042e35521de4b5c8baf6446cc"
+      }
+    },
+    {
+      "name": "emil-animate-expo",
+      "description": "Re-exported and pinned: emilkowalski/skills - the animate-expo skill only (React Native / Expo animation craft: Reanimated v4 worklets, gesture handoff, springs, haptics). A vibe-expo dependency.",
+      "source": {
+        "source": "git-subdir",
+        "url": "emilkowalski/skills",
+        "path": "skills/animate-expo",
+        "ref": "main",
+        "sha": "e879241fab3cdb22e8d95587cdbf40b57a88d7da"
+      }
+    },
+    {
+      "name": "emil-design-eng",
+      "description": "Re-exported and pinned: emilkowalski/skills - Emil Kowalski's full design-engineering collection (animation craft and audits, Apple-design-for-web, UI library picks, prototyping, Sonner). Web-focused; optional and never auto-installed - no VIBE plugin depends on it; install per project where you do web/UI design work. The Expo-specific animate-expo skill also ships separately as a vibe-expo dependency.",
+      "source": {
+        "source": "github",
+        "repo": "emilkowalski/skills",
+        "ref": "main",
+        "sha": "e879241fab3cdb22e8d95587cdbf40b57a88d7da"
       }
     },
     {
