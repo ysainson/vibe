@@ -7,5 +7,6 @@
   },
   "dependencies": [
     "superpowers"
-  ]
+  ],
+  "hooks": "./hooks/claude-hooks.json"
 }
