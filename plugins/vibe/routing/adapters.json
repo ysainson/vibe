@@ -1,0 +1,10 @@
+{
+  "claude-native":   { "host": "claude", "runtime": "claude", "efforts": ["default"] },
+  "codex-exec":      { "host": "claude", "runtime": "codex",  "efforts": ["default","minimal","low","medium","high","xhigh"], "cli": "codex 0.153" },
+  "codex-agent":     { "host": "codex",  "runtime": "codex",  "efforts": ["default","minimal","low","medium","high","xhigh"] },
+  "cc-companion":    { "host": "codex",  "runtime": "claude", "pin": "v1.5.0", "sha": "19e565151f35b328a5b9433df351bd8f3818fdc7",
+                       "marketplace": { "repo": "sendbird/codex-marketplace", "sha": "b614ba66b8194f71a4c5e64c916a91fc2f8ee600" },
+                       "paths": { "task": ["default","low","medium","high","xhigh","max"], "review": ["default","low","medium","high","xhigh","max"], "adversarial-review": ["default","low","medium","high","xhigh","max"] } },
+  "codex-companion": { "host": "claude", "runtime": "codex",  "pin": "v1.0.6", "sha": "db52e28f4d9ded852ab3942cea316258ae4ef346",
+                       "paths": { "task": ["default","none","minimal","low","medium","high","xhigh"], "review": ["default"], "adversarial-review": ["default"] } }
+}

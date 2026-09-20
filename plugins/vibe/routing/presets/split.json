@@ -1,0 +1,17 @@
+{
+  "roles": {
+    "doer": { "runtime": "codex", "model": "default", "effort": "high" },
+    "doer-mechanical": { "runtime": "codex", "model": "default", "effort": "medium" },
+    "escalation": { "runtime": "claude", "model": "opus", "effort": "default" },
+    "exploration": { "runtime": "claude", "model": "sonnet", "effort": "default" },
+    "contract-writer": { "runtime": "claude", "model": "default", "effort": "default" },
+    "reviewer-spec": { "runtime": "claude", "model": "opus", "effort": "default" },
+    "reviewer-quality": { "runtime": "claude", "model": "opus", "effort": "default" },
+    "verifier": { "runtime": "claude", "model": "opus", "effort": "default" },
+    "security-verifier": { "runtime": "claude", "model": "opus", "effort": "default" },
+    "guardians": { "runtime": "claude", "model": "opus", "effort": "default" },
+    "cross-check": { "runtime": "cross", "model": "default", "effort": "default" },
+    "adversarial": { "runtime": "cross", "model": "default", "effort": "default" },
+    "plan-check": { "runtime": "cross", "model": "default", "effort": "xhigh" }
+  }
+}
