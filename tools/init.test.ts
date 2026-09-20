@@ -726,3 +726,63 @@ test("a user-scope write never carries a project key", () => {
     h.cleanup();
   }
 });
+
+test("write rejects values the resolver would refuse", () => {
+  const h = makeHarness({ mode: "ok" });
+  const routingCli = join(root, "plugins", "vibe", "scripts", "routing.mjs");
+  try {
+    // More than 32 disposable paths: refused before anything lands on disk.
+    const forty = Array.from({ length: 40 }, (_, i) => `d${String(i).padStart(9, "0")}`).join(",");
+    const tooMany = run(h, ["write", "--host", "claude", "--scope", "project", "--cwd", h.project, "--project-disposable", forty, "--yes"]);
+    expect(tooMany.status).toBe(2);
+    expect(existsSync(projectFile(h))).toBe(false);
+    expect(resolve(h, { host: "claude" }).profile).toBe("tiered");
+
+    // A model that is really a CLI flag, and a runtime that does not exist.
+    for (const set of ["doer=claude:--dangerously-skip-permissions", "doer=bogus"]) {
+      const bad = run(h, ["write", "--host", "claude", "--scope", "user", "--set", set, "--yes"]);
+      expect(bad.status).toBe(2);
+      expect(existsSync(userFile(h))).toBe(false);
+      expect(resolve(h, { host: "claude" }).profile).toBe("tiered");
+    }
+
+    // The resolver CLI agrees: with no file written, it still resolves to the defaults.
+    const resolved = spawnSync(process.execPath, [routingCli, "resolve", "--host", "claude", "--json"], {
+      cwd: h.project,
+      env: h.env,
+      encoding: "utf8",
+    });
+    expect(resolved.status).toBe(0);
+    expect(JSON.parse(resolved.stdout).profile).toBe("tiered");
+  } finally {
+    h.cleanup();
+  }
+});
+
+test("write refuses a routing file that is not a JSON object", () => {
+  const h = makeHarness({ mode: "ok" });
+  const routingCli = join(root, "plugins", "vibe", "scripts", "routing.mjs");
+  try {
+    for (const content of ["null", '"str"']) {
+      writeFileSync(userFile(h), content);
+      const result = run(h, ["write", "--host", "claude", "--scope", "user", "--yes"]);
+      expect(result.status).toBe(2);
+      expect(result.stderr).toContain(join(".agents", "vibe", "routing.json"));
+      expect(readFileSync(userFile(h), "utf8")).toBe(content);
+
+      // The resolver refuses the same file with a one-line RoutingError, not a stack trace.
+      const resolved = spawnSync(process.execPath, [routingCli, "resolve", "--host", "claude"], {
+        cwd: h.project,
+        env: h.env,
+        encoding: "utf8",
+      });
+      expect(resolved.status).toBe(2);
+      const stderr = resolved.stderr.trimEnd();
+      expect(stderr.length).toBeGreaterThan(0);
+      expect(stderr.split("\n")).toHaveLength(1);
+      expect(stderr).not.toMatch(/\bat \S*\//);
+    }
+  } finally {
+    h.cleanup();
+  }
+});

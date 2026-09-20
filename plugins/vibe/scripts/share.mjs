@@ -62,7 +62,7 @@ import {
 } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { dirname, join, relative, resolve, sep } from "node:path";
+import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { homedir, tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 
@@ -329,6 +329,19 @@ export function planShare({ scope, cwd, home, prefer } = {}) {
   if (scope === "project") {
     const claudeMdPath = join(root, "CLAUDE.md");
     const agentsMdPath = join(root, "AGENTS.md");
+
+    // A symlinked CLAUDE.md or AGENTS.md (dangling included) is refused
+    // outright: a hostile clone could otherwise point either at a file
+    // outside the repo and have `apply` read from or write through it.
+    for (const [label, path] of [
+      ["CLAUDE.md", claudeMdPath],
+      ["AGENTS.md", agentsMdPath],
+    ]) {
+      if (statOrNull(path)?.isSymbolicLink()) {
+        throw new ShareError(`${label} is a symlink; refusing to plan a symlinked context file (at ${path})`);
+      }
+    }
+
     if (existsSync(claudeMdPath)) {
       const body = readFileSync(claudeMdPath, "utf8");
       if (!body.startsWith("@AGENTS.md")) {
@@ -534,16 +547,37 @@ function resolveConflicts(plan) {
   }
 }
 
+function assertNotSymlink(path) {
+  if (statOrNull(path)?.isSymbolicLink()) {
+    throw new ShareError(`refusing to write through symlink at ${path}`);
+  }
+}
+
+/** Atomically replace `targetPath`'s content via a sibling temp file + rename (never follows a symlink). */
+function atomicWrite(targetPath, content) {
+  const tmpPath = join(dirname(targetPath), `.${basename(targetPath)}.tmp-${randomUUID().slice(0, 8)}`);
+  writeFileSync(tmpPath, content);
+  renameSync(tmpPath, targetPath);
+}
+
 function executeOp(op) {
   switch (op.kind) {
     case "move-claude-md":
-      writeFileSync(op.to, readFileSync(op.from, "utf8"));
+      // `to` (AGENTS.md) must not already exist in any form — real file,
+      // dangling symlink, or a symlink to a file outside the repo. `wx`
+      // creates exclusively and fails closed (EEXIST) on all three instead
+      // of silently writing through a link planted between plan and apply.
+      writeFileSync(op.to, readFileSync(op.from, "utf8"), { flag: "wx" });
       break;
-    case "append-claude-md":
-      writeFileSync(op.to, readFileSync(op.to, "utf8") + IMPORT_HEADING + readFileSync(op.from, "utf8"));
+    case "append-claude-md": {
+      assertNotSymlink(op.to);
+      const merged = readFileSync(op.to, "utf8") + IMPORT_HEADING + readFileSync(op.from, "utf8");
+      atomicWrite(op.to, merged);
       break;
+    }
     case "write-claude-md-import":
-      writeFileSync(op.from, CLAUDE_MD_IMPORT);
+      assertNotSymlink(op.from);
+      atomicWrite(op.from, CLAUDE_MD_IMPORT);
       break;
     case "move-skill":
       mkdirSync(dirname(op.to), { recursive: true });

@@ -629,3 +629,79 @@ test("an extra empty subdirectory makes two skill dirs differ", () => {
     expect(conflict!.files.some((f: any) => /(^|\/)sub\/?$/.test(f.path))).toBe(true);
   });
 });
+
+// --- Security: context files that are symlinks must never be followed (arbitrary-file write) ---
+
+// Victim files live in their own temp dir, outside the repo under migration.
+function withVictims(fn: (outside: string) => void): void {
+  const outside = mkdtempSync(join(tmpdir(), "share-victim-"));
+  try {
+    fn(outside);
+  } finally {
+    rmSync(outside, { recursive: true, force: true });
+  }
+}
+
+const VICTIM = "victim shell rc, must stay exactly this\n";
+const SECRET = "API_KEY=do-not-copy-me\n";
+
+const symlinkedContextCases: { name: string; file: "AGENTS.md" | "CLAUDE.md"; setup: (cwd: string, outside: string) => void }[] = [
+  {
+    name: "AGENTS.md is a symlink to a file outside the repo",
+    file: "AGENTS.md",
+    setup: (cwd, outside) => symlinkSync(join(outside, "victim.txt"), join(cwd, "AGENTS.md")),
+  },
+  {
+    name: "CLAUDE.md is a symlink to a secrets file and there is no AGENTS.md",
+    file: "CLAUDE.md",
+    setup: (cwd, outside) => {
+      rmSync(join(cwd, "CLAUDE.md"));
+      symlinkSync(join(outside, "secrets.env"), join(cwd, "CLAUDE.md"));
+    },
+  },
+  {
+    name: "AGENTS.md is a dangling symlink",
+    file: "AGENTS.md",
+    setup: (cwd, outside) => symlinkSync(join(outside, "does-not-exist"), join(cwd, "AGENTS.md")),
+  },
+];
+
+for (const c of symlinkedContextCases) {
+  test(`a symlinked context file is refused at plan time: ${c.name}`, () => {
+    withVictims((outside) => {
+      writeFileSync(join(outside, "victim.txt"), VICTIM);
+      writeFileSync(join(outside, "secrets.env"), SECRET);
+      withRepo(buildMinimalRepo, (cwd) => {
+        c.setup(cwd, outside);
+        const before = snapshot(cwd);
+        const err = caught(() => planShare({ scope: "project", cwd }));
+        expect(err).toBeInstanceOf(ShareError);
+        expect((err as Error).message).toContain(c.file);
+        expect(readFileSync(join(outside, "victim.txt"), "utf8")).toBe(VICTIM);
+        expect(readFileSync(join(outside, "secrets.env"), "utf8")).toBe(SECRET);
+        expect(existsSync(join(outside, "does-not-exist"))).toBe(false);
+        // No real AGENTS.md appeared in the repo: either absent or still the untouched link.
+        const agents = join(cwd, "AGENTS.md");
+        if (existsSync(dirname(agents)) && lstatSync(agents, { throwIfNoEntry: false })) {
+          expect(lstatSync(agents).isSymbolicLink()).toBe(true);
+        }
+        expect(snapshot(cwd)).toEqual(before);
+      });
+    });
+  });
+}
+
+test("apply creates AGENTS.md exclusively and never follows a link at write time", () => {
+  withVictims((outside) => {
+    writeFileSync(join(outside, "victim.txt"), VICTIM);
+    withRepo(buildMinimalRepo, (cwd) => {
+      const plan = planShare({ scope: "project", cwd });
+      expect(ops(plan, "move-claude-md").length).toBe(1);
+      // Race: between plan and apply, AGENTS.md's path becomes a link to a file outside the repo.
+      symlinkSync(join(outside, "victim.txt"), join(cwd, "AGENTS.md"));
+      const err = caught(() => applyShare(plan, { yes: true }));
+      expect(err).toBeInstanceOf(ShareError);
+      expect(readFileSync(join(outside, "victim.txt"), "utf8")).toBe(VICTIM);
+    });
+  });
+});

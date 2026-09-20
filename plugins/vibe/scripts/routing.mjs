@@ -168,9 +168,10 @@ export class RoutingError extends Error {
  * A role's `runtime` value against the rules that don't depend on a host:
  * the three review roles accept only `cross`, `contract-writer` accepts only
  * `claude`, and no other role may use `cross`. `context` (e.g. `preset "split"`
- * or `host "codex"`) is folded into the error message.
+ * or `host "codex"`) is folded into the error message. Exported so a writer
+ * (e.g. `init.mjs`) can validate a role entry before writing it.
  */
-function validateRuntime(role, runtime, context) {
+export function validateRuntime(role, runtime, context) {
   if (!RUNTIME_VALUES.includes(runtime)) {
     throw new RoutingError(`role "${role}" (${context}): invalid runtime "${runtime}"`);
   }
@@ -187,8 +188,12 @@ function validateRuntime(role, runtime, context) {
   }
 }
 
-/** A model value from a routing file (or `--set`) — a bare name, 1-64 chars of `MODEL_PATTERN`. */
-function validateFileModel(role, model, context) {
+/**
+ * A model value from a routing file (or `--set`) — a bare name, 1-64 chars of
+ * `MODEL_PATTERN`. Exported so a writer (e.g. `init.mjs`) can validate a
+ * model before writing it.
+ */
+export function validateFileModel(role, model, context) {
   if (typeof model !== "string" || !MODEL_PATTERN.test(model)) {
     throw new RoutingError(`role "${role}" (${context}): model must match ${MODEL_PATTERN}`);
   }
@@ -228,12 +233,12 @@ function truncateCodePoints(text, max) {
  * @param {string} text
  * @returns {string}
  */
-export function sanitizeForBlock(text) {
+export function sanitizeForBlock(text, maxCodePoints = 120) {
   const cleaned = String(text)
     .replace(BLOCK_FORMAT_CHARS, " ")
     .replace(BLOCK_STRUCTURE_CHARS, "")
     .replace(/ {2,}/g, " ");
-  return truncateCodePoints(cleaned, 120);
+  return truncateCodePoints(cleaned, maxCodePoints);
 }
 
 /** An `egress` block's shape: only `openai`/`anthropic` keys, only `review`/`doer` classes. */
@@ -257,9 +262,10 @@ function validateEgressAck(egress, context) {
  * `MAX_PROJECT_LIST_ENTRIES` entries of at most `MAX_PROJECT_ENTRY_CHARS`
  * characters. An unbounded project file must never be able to balloon the
  * injected block — this is the reject-outright half; `formatMarkdown` still
- * truncates (never throws) the composed line as a backstop.
+ * truncates (never throws) the composed line as a backstop. Exported so a
+ * writer (e.g. `init.mjs`) can validate a project block before writing it.
  */
-function validateProjectBlock(project, context) {
+export function validateProjectBlock(project, context) {
   if (typeof project !== "object" || project === null || Array.isArray(project)) {
     throw new RoutingError(`project (${context}): must be an object`);
   }
@@ -358,8 +364,9 @@ export function loadAdapters(path = DEFAULT_ADAPTERS_PATH) {
   }
   try {
     return JSON.parse(raw);
-  } catch (e) {
-    throw new RoutingError(`adapters table ${path}: invalid JSON (${e.message})`);
+  } catch {
+    // Path only — never the parser's message, which can echo file content.
+    throw new RoutingError(`adapters table ${path}: invalid JSON`);
   }
 }
 
@@ -403,13 +410,61 @@ export function parseSet(text) {
 }
 
 /**
- * Parse a project/user routing file: validates the `project` block is only
- * present where allowed (and, where it is, that its own shape and bounds
- * hold), that any `egress` block and `roles` keys are well-formed, and that
- * any numeric knob is an in-range integer. Returns the parsed JSON, or `null`
- * only when the file is genuinely absent (`ENOENT`) — any other read failure
- * (permissions, a directory in its place, ...) is a `RoutingError` naming the
- * path, not a silent "no file".
+ * Validate a parsed routing document: top-level shape (a plain object — not
+ * `null`, an array, or a scalar), `project` (only where `allowProject`, and
+ * where present its own shape/bounds), `egress`, role keys, and each present
+ * role entry's `runtime`/`model` shape. Not `effort` — validating that needs
+ * a host to resolve an adapter against, so it stays lazy, done only for the
+ * role entry that actually wins precedence, in `resolveRouting`'s per-role
+ * merge. `context` (e.g. `routing file ${path}`) is folded into every
+ * message. Exported so a writer (e.g. `init.mjs`) can validate a document
+ * before writing it, the same way `loadRoutingFile` validates one after
+ * reading it.
+ *
+ * @param {unknown} data
+ * @param {{ allowProject: boolean, context: string }} opts
+ */
+export function validateRoutingDocument(data, { allowProject, context }) {
+  if (typeof data !== "object" || data === null || Array.isArray(data)) {
+    throw new RoutingError(`${context}: must be a JSON object`);
+  }
+  if (!allowProject && data.project !== undefined) {
+    throw new RoutingError(`${context}: "project" is only allowed in the project-scope routing file`);
+  }
+  if (data.project !== undefined) {
+    validateProjectBlock(data.project, context);
+  }
+  if (data.egress !== undefined) {
+    validateEgressAck(data.egress, context);
+  }
+  if (data.roles !== undefined) {
+    if (typeof data.roles !== "object" || data.roles === null || Array.isArray(data.roles)) {
+      throw new RoutingError(`${context}: "roles" must be an object`);
+    }
+    for (const [role, entry] of Object.entries(data.roles)) {
+      if (!ROLES.includes(role)) {
+        throw new RoutingError(`${context}: unknown role "${role}"`);
+      }
+      if (!entry || typeof entry.runtime !== "string" || entry.runtime.length === 0) {
+        throw new RoutingError(`role "${role}" (${context}): must specify runtime`);
+      }
+      validateRuntime(role, entry.runtime, context);
+      validateFileModel(role, entry.model ?? "default", context);
+    }
+  }
+  for (const key of NUMERIC_FIELDS) {
+    if (data[key] !== undefined) {
+      validateNumericKnob(key, data[key], context);
+    }
+  }
+}
+
+/**
+ * Parse a project/user routing file: reads and JSON-parses it, then runs
+ * `validateRoutingDocument` over the result. Returns the parsed JSON, or
+ * `null` only when the file is genuinely absent (`ENOENT`) — any other read
+ * failure (permissions, a directory in its place, ...) is a `RoutingError`
+ * naming the path, not a silent "no file".
  */
 function loadRoutingFile(path, { allowProject }) {
   let raw;
@@ -428,27 +483,7 @@ function loadRoutingFile(path, { allowProject }) {
     // Path only — never the parser's message, which can echo file content.
     throw new RoutingError(`routing file ${path}: invalid JSON`);
   }
-  if (!allowProject && data.project !== undefined) {
-    throw new RoutingError(`routing file ${path}: "project" is only allowed in the project-scope routing file`);
-  }
-  if (data.project !== undefined) {
-    validateProjectBlock(data.project, path);
-  }
-  if (data.egress !== undefined) {
-    validateEgressAck(data.egress, path);
-  }
-  if (data.roles !== undefined) {
-    for (const role of Object.keys(data.roles)) {
-      if (!ROLES.includes(role)) {
-        throw new RoutingError(`routing file ${path}: unknown role "${role}"`);
-      }
-    }
-  }
-  for (const key of NUMERIC_FIELDS) {
-    if (data[key] !== undefined) {
-      validateNumericKnob(key, data[key], `routing file ${path}`);
-    }
-  }
+  validateRoutingDocument(data, { allowProject, context: `routing file ${path}` });
   return data;
 }
 
@@ -800,8 +835,8 @@ export function formatMarkdown(resolved) {
     const p = resolved.project;
     const install = sanitizeForBlock(p.install);
     const test = sanitizeForBlock(p.test);
-    const disposablePaths = fmtList(p.disposable_paths.map(sanitizeForBlock));
-    const secretAllowlist = fmtList(p.secret_allowlist.map(sanitizeForBlock));
+    const disposablePaths = fmtList(p.disposable_paths.map((x) => sanitizeForBlock(x)));
+    const secretAllowlist = fmtList(p.secret_allowlist.map((x) => sanitizeForBlock(x)));
     const projectLine =
       `project: install="${install}" test="${test}" ` +
       `disposable_paths=${disposablePaths} secret_allowlist=${secretAllowlist}`;

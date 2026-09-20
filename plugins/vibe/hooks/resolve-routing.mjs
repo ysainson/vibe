@@ -68,7 +68,7 @@ function main() {
     additionalContext = formatMarkdown(resolveRouting({ host, cwd: process.cwd(), home: homedir() }));
   } catch (e) {
     const kind = e instanceof RoutingError ? "routing" : "internal";
-    additionalContext = `<VIBE_ROUTING host="${host}" error="${kind}">\n${sanitizeForBlock(e.message)}\n</VIBE_ROUTING>\n`;
+    additionalContext = `<VIBE_ROUTING host="${host}" error="${kind}">\n${sanitizeForBlock(e.message, 400)}\n</VIBE_ROUTING>\n`;
   }
 
   process.stdout.write(

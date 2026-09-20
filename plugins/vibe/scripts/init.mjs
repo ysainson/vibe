@@ -46,6 +46,7 @@ import {
   loadPreset,
   parseSet,
   resolveRouting,
+  validateRoutingDocument,
 } from "./routing.mjs";
 
 /**
@@ -87,14 +88,17 @@ function assertNoSymlink(path) {
  * Write `content` to `path` atomically: a sibling temp file (same directory,
  * `wx` so two concurrent writers can't collide) then `renameSync`d over the
  * target — no reader ever sees a partial write. The temp file inherits the
- * target's current mode (or `0o600` when the target is absent, never the
- * process umask's laxer default) and is cleaned up if the rename never
- * happens.
+ * target's current mode with group/other write stripped (`& ~0o022`), or
+ * `0o600` when the target is absent — never the process umask's laxer
+ * default, and never wider than what was already there — and is cleaned up
+ * if the rename never happens.
  */
 function atomicWriteFile(path, content) {
   let mode = 0o600;
   try {
-    mode = statSync(path).mode & 0o777;
+    // Never widen past the inherited mode's group/other bits, even if the
+    // existing file was somehow already loose (e.g. `0o644`) — clamp them off.
+    mode = statSync(path).mode & 0o777 & ~0o022;
   } catch {
     // absent — default to 0o600
   }
@@ -342,13 +346,18 @@ function readExistingRouting(path) {
     }
     throw new RoutingError(`cannot read ${path}: ${e.message}`);
   }
+  let data;
   try {
-    return JSON.parse(raw);
+    data = JSON.parse(raw);
   } catch {
     // Never echo the parser's message — it can quote back bytes of the file
     // (which, e.g. through a symlink, may not even be a routing file at all).
     throw new RoutingError(`routing file ${path}: invalid JSON`);
   }
+  if (typeof data !== "object" || data === null || Array.isArray(data)) {
+    throw new RoutingError(`routing file ${path}: must be a JSON object`);
+  }
+  return data;
 }
 
 /**
@@ -444,6 +453,16 @@ export function writeRouting({
   if (scope === "user") {
     delete output.project; // never valid at user scope — the resolver rejects it there
   }
+  // Never persist a document the resolver itself would refuse (an out-of-range knob, an
+  // oversized project list, a dash-led "model" smuggling a CLI flag, an unknown runtime,
+  // ...) — a bad value written here means every SessionStart hook fails from then on.
+  validateRoutingDocument(output, { allowProject: scope === "project", context: `routing file ${targetPath}` });
+
+  // Re-check the two container components right before touching the filesystem — the first
+  // check (above) closes the common case, but this closes the TOCTOU window between it and
+  // the mkdir/write below.
+  assertNoSymlink(join(scopeRoot, ".agents"));
+  assertNoSymlink(join(scopeRoot, ".agents", "vibe"));
 
   mkdirSync(dirname(targetPath), { recursive: true });
   atomicWriteFile(targetPath, `${JSON.stringify(output, null, 2)}\n`);
