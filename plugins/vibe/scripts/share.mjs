@@ -197,6 +197,24 @@ function classify(path, canonicalDir) {
   return { type: "other" };
 }
 
+/**
+ * None of `.claude/skills`, `.codex/skills`, `.agents/skills` may themselves
+ * be a symlink — the union walk cannot safely reason about what it might
+ * alias. Checked at plan time, and re-checked at the top of `applyShare`
+ * (before any write) in case one was swapped for a symlink after planning.
+ */
+function assertSkillsContainersAreReal({ claudeSkillsDir, codexSkillsDir, canonicalDir }) {
+  for (const [label, dir] of [
+    [".claude/skills", claudeSkillsDir],
+    [".codex/skills", codexSkillsDir],
+    [".agents/skills", canonicalDir],
+  ]) {
+    if (statOrNull(dir)?.isSymbolicLink()) {
+      throw new ShareError(`${label} is a symlink; refusing a symlinked skills container (at ${dir})`);
+    }
+  }
+}
+
 function listEntriesRecursive(dir, base = dir, out = []) {
   if (!existsSync(dir)) return out;
   for (const name of readdirSync(dir)) {
@@ -236,6 +254,27 @@ function diffDirs(dirA, dirB) {
     if (!same) diffs.push({ path: rel, detail: `differs between ${dirA} and ${dirB}` });
   }
   return diffs;
+}
+
+/**
+ * Refuse (`ShareError`) if any entry under `dir` is a symlink resolving
+ * outside `root`. Guards `resolveConflicts`' `cpSync`, which would otherwise
+ * (even with `dereference: false`, the default — it copies the link itself,
+ * not its target) relocate a repo-escaping symlink into the canonical tree,
+ * where a later `.claude/skills`/`.codex/skills` alias could reach it.
+ */
+function assertNoEscapingSymlinks(dir, root, skillName) {
+  for (const rel of listEntriesRecursive(dir)) {
+    const p = join(dir, rel);
+    const st = lstatSync(p);
+    if (!st.isSymbolicLink()) continue;
+    const resolved = resolve(dirname(p), readlinkSync(p));
+    if (!isUnderDir(resolved, root)) {
+      throw new ShareError(
+        `refusing to copy skill "${skillName}": ${p} is a symlink pointing outside the repo (at ${resolved})`,
+      );
+    }
+  }
 }
 
 function readSkillFrontmatter(skillDir) {
@@ -282,17 +321,10 @@ export function planShare({ scope, cwd, home, prefer } = {}) {
   }
 
   const root = scope === "user" ? (home ?? homedir()) : (cwd ?? process.cwd());
-  const { claudeSkillsDir, codexSkillsDir, canonicalDir } = skillDirs(root);
+  const dirs = skillDirs(root);
+  const { claudeSkillsDir, codexSkillsDir, canonicalDir } = dirs;
 
-  for (const [label, dir] of [
-    [".claude/skills", claudeSkillsDir],
-    [".codex/skills", codexSkillsDir],
-    [".agents/skills", canonicalDir],
-  ]) {
-    if (statOrNull(dir)?.isSymbolicLink()) {
-      throw new ShareError(`${label} is a symlink; refusing to plan a symlinked skills container (at ${dir})`);
-    }
-  }
+  assertSkillsContainersAreReal(dirs);
 
   const allNames = new Set([...listNames(claudeSkillsDir), ...listNames(codexSkillsDir), ...listNames(canonicalDir)]);
   const sortedNames = [...allNames].sort();
@@ -482,6 +514,13 @@ export function planShare({ scope, cwd, home, prefer } = {}) {
 // --- applying ---
 
 function ensureSymlink(fromPath, toAbsolutePath) {
+  // Defense in depth on top of `applyShare`'s own re-check: never act inside
+  // a container (`.claude/skills`, `.codex/skills`, `.agents/skills`) that
+  // has itself become a symlink, whatever the caller.
+  const container = dirname(fromPath);
+  if (statOrNull(container)?.isSymbolicLink()) {
+    throw new ShareError(`refusing to write into symlinked container ${container}`);
+  }
   const st = statOrNull(fromPath);
   if (st) {
     if (st.isDirectory()) {
@@ -541,9 +580,10 @@ function resolveConflicts(plan) {
   for (const conflict of plan.conflicts) {
     const dest = join(canonicalDir, conflict.skill);
     const source = join(sourceSkillsDir, conflict.skill);
+    assertNoEscapingSymlinks(source, plan.root, conflict.skill);
     if (statOrNull(dest)) rmSync(dest, { recursive: true, force: true });
     mkdirSync(dirname(dest), { recursive: true });
-    cpSync(source, dest, { recursive: true });
+    cpSync(source, dest, { recursive: true, dereference: false });
   }
 }
 
@@ -553,10 +593,19 @@ function assertNotSymlink(path) {
   }
 }
 
-/** Atomically replace `targetPath`'s content via a sibling temp file + rename (never follows a symlink). */
+/**
+ * Atomically replace `targetPath`'s content via a sibling temp file + rename
+ * (never follows a symlink). The temp file inherits the target's current
+ * mode with group/other write stripped (`& ~0o022`), like `init.mjs`'s
+ * `atomicWriteFile` — never wider than what was already there. `CLAUDE.md`
+ * and `AGENTS.md` are prose, not secrets, so the fallback when the target is
+ * (unexpectedly) absent is the ordinary `0o644` default, not `init.mjs`'s
+ * `0o600` for its config file.
+ */
 function atomicWrite(targetPath, content) {
+  const mode = (statOrNull(targetPath)?.mode ?? 0o644) & 0o777 & ~0o022;
   const tmpPath = join(dirname(targetPath), `.${basename(targetPath)}.tmp-${randomUUID().slice(0, 8)}`);
-  writeFileSync(tmpPath, content);
+  writeFileSync(tmpPath, content, { mode, flag: "wx" });
   renameSync(tmpPath, targetPath);
 }
 
@@ -567,11 +616,19 @@ function executeOp(op) {
       // dangling symlink, or a symlink to a file outside the repo. `wx`
       // creates exclusively and fails closed (EEXIST) on all three instead
       // of silently writing through a link planted between plan and apply.
+      // `from` (CLAUDE.md) is re-checked immediately before it is read, in
+      // case it was swapped for a symlink in that same window — otherwise
+      // its content (potentially a secret file outside the repo) would be
+      // read and written into the new AGENTS.md before the `wx` write even
+      // has a chance to fail.
+      assertNotSymlink(op.from);
       writeFileSync(op.to, readFileSync(op.from, "utf8"), { flag: "wx" });
       break;
     case "append-claude-md": {
       assertNotSymlink(op.to);
-      const merged = readFileSync(op.to, "utf8") + IMPORT_HEADING + readFileSync(op.from, "utf8");
+      const existing = readFileSync(op.to, "utf8");
+      assertNotSymlink(op.from);
+      const merged = existing + IMPORT_HEADING + readFileSync(op.from, "utf8");
       atomicWrite(op.to, merged);
       break;
     }
@@ -619,6 +676,10 @@ function conflictMessage(conflicts) {
  */
 export function applyShare(plan, { yes } = {}) {
   if (yes !== true) throw new ShareError("apply requires explicit confirmation (pass yes: true / --yes)");
+  // Re-check: a container swapped for a symlink between `planShare` and this
+  // call must not be silently trusted — `ensureSymlink` would otherwise
+  // `rmSync` whatever it resolves to.
+  assertSkillsContainersAreReal(skillDirs(plan.root));
   if (plan.conflicts.length > 0 && !plan.prefer) throw new ShareError(conflictMessage(plan.conflicts));
   if (plan.conflicts.length > 0) validatePreferSources(plan);
 

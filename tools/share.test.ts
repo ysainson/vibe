@@ -705,3 +705,60 @@ test("apply creates AGENTS.md exclusively and never follows a link at write time
     });
   });
 });
+
+// --- Security: apply must re-check what it is about to read or write, not trust the plan ---
+
+const SKILL_FOO = "---\nname: foo\ndescription: Identical everywhere.\n---\n";
+
+// CLAUDE.md plus an identical `foo` under all three skills containers.
+function buildTripleRepo(dir: string): void {
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, "CLAUDE.md"), "# triple repo\n");
+  for (const side of [".claude", ".codex", ".agents"]) {
+    mkdirSync(join(dir, side, "skills/foo"), { recursive: true });
+    writeFileSync(join(dir, side, "skills/foo/SKILL.md"), SKILL_FOO);
+  }
+}
+
+for (const existing of [true, false]) {
+  const kind = existing ? "append-claude-md" : "move-claude-md";
+  test(`apply re-checks the source context file before reading it (${kind})`, () => {
+    withVictims((outside) => {
+      writeFileSync(join(outside, "secrets.env"), "AWS_SECRET=x\n");
+      withRepo(buildMinimalRepo, (cwd) => {
+        if (existing) writeFileSync(join(cwd, "AGENTS.md"), "# agents\n");
+        const plan = planShare({ scope: "project", cwd });
+        expect(ops(plan, kind).length).toBe(1);
+        // Race: CLAUDE.md becomes a link to a secrets file after planning.
+        rmSync(join(cwd, "CLAUDE.md"));
+        symlinkSync(join(outside, "secrets.env"), join(cwd, "CLAUDE.md"));
+        const err = caught(() => applyShare(plan, { yes: true }));
+        expect(err).toBeInstanceOf(ShareError);
+        expect((err as Error).message).toContain("CLAUDE.md");
+        if (existing) expect(readFileSync(join(cwd, "AGENTS.md"), "utf8")).not.toContain("AWS_SECRET");
+        else expect(existsSync(join(cwd, "AGENTS.md"))).toBe(false);
+      });
+    });
+  });
+}
+
+for (const which of [".claude/skills", ".codex/skills", ".agents/skills"] as const) {
+  test(`apply re-checks the skills containers before any write (${which})`, () => {
+    withVictims((outside) => {
+      const vdir = join(outside, "vdir");
+      mkdirSync(join(vdir, "foo"), { recursive: true });
+      writeFileSync(join(vdir, "foo/SKILL.md"), SKILL_FOO);
+      writeFileSync(join(vdir, "foo/private.txt"), "private, must survive\n");
+      withRepo(buildTripleRepo, (cwd) => {
+        const plan = planShare({ scope: "project", cwd });
+        // Race: the container becomes a link to a directory outside the repo after planning.
+        rmSync(join(cwd, which), { recursive: true });
+        symlinkSync(vdir, join(cwd, which));
+        const err = caught(() => applyShare(plan, { yes: true }));
+        expect(err).toBeInstanceOf(ShareError);
+        expect((err as Error).message).toContain(which);
+        expect(readFileSync(join(vdir, "foo/private.txt"), "utf8")).toBe("private, must survive\n");
+      });
+    });
+  });
+}
