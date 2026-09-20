@@ -111,7 +111,7 @@ test("write and verify commands", () => {
   const text = body(skill());
   const lower = text.toLowerCase();
   expect(text).toMatch(/init\.mjs"? write --host[^\n]*--yes/);
-  expect(text).toMatch(/init\.mjs bridges/);
+  expect(text).toMatch(/init\.mjs bridges --host[^\n]*--yes/);
   expect(text).toMatch(/init\.mjs show/);
   expect(text).toContain("${CLAUDE_PLUGIN_ROOT}");
   expect(text).toContain("${PLUGIN_ROOT}");

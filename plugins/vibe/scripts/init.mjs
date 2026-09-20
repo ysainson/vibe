@@ -24,7 +24,17 @@
  *   node init.mjs agents-cap --max-parallel <n> [--codex-config <path>]
  */
 import { spawnSync } from "node:child_process";
-import { existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, renameSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  readFileSync,
+  realpathSync,
+  renameSync,
+  statSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -57,6 +67,53 @@ import {
 // EGRESS_CLASSES aren't exported — this file validates `--egress` independently).
 const EGRESS_PROVIDERS = ["openai", "anthropic"];
 const EGRESS_CLASSES = ["review", "doer"];
+
+// --- filesystem safety (shared by writeRouting and ensureAgentsCap) ---
+
+/** Throws `RoutingError` naming `path` if it exists and is a symlink (dangling or not); absent is fine. */
+function assertNoSymlink(path) {
+  let stat;
+  try {
+    stat = lstatSync(path);
+  } catch {
+    return; // absent — nothing to refuse
+  }
+  if (stat.isSymbolicLink()) {
+    throw new RoutingError(`refusing to write through a symlink: ${path}`);
+  }
+}
+
+/**
+ * Write `content` to `path` atomically: a sibling temp file (same directory,
+ * `wx` so two concurrent writers can't collide) then `renameSync`d over the
+ * target — no reader ever sees a partial write. The temp file inherits the
+ * target's current mode (or `0o600` when the target is absent, never the
+ * process umask's laxer default) and is cleaned up if the rename never
+ * happens.
+ */
+function atomicWriteFile(path, content) {
+  let mode = 0o600;
+  try {
+    mode = statSync(path).mode & 0o777;
+  } catch {
+    // absent — default to 0o600
+  }
+  const tmpPath = `${path}.${process.pid}.${Date.now()}.tmp`;
+  let renamed = false;
+  try {
+    writeFileSync(tmpPath, content, { mode, flag: "wx" });
+    renameSync(tmpPath, path);
+    renamed = true;
+  } finally {
+    if (!renamed) {
+      try {
+        unlinkSync(tmpPath);
+      } catch {
+        // best-effort cleanup
+      }
+    }
+  }
+}
 
 const CC_SETUP_REMINDER = "run $cc:setup inside Codex, then restart Codex if it asks";
 
@@ -287,8 +344,10 @@ function readExistingRouting(path) {
   }
   try {
     return JSON.parse(raw);
-  } catch (e) {
-    throw new RoutingError(`routing file ${path}: invalid JSON (${e.message})`);
+  } catch {
+    // Never echo the parser's message — it can quote back bytes of the file
+    // (which, e.g. through a symlink, may not even be a routing file at all).
+    throw new RoutingError(`routing file ${path}: invalid JSON`);
   }
 }
 
@@ -335,8 +394,14 @@ export function writeRouting({
     throw new RoutingError(`--scope must be "user" or "project" (got "${scope}")`);
   }
 
-  const targetPath =
-    scope === "user" ? join(home, ".agents", "vibe", "routing.json") : join(cwd, ".agents", "vibe", "routing.json");
+  const scopeRoot = scope === "user" ? home : cwd;
+  const targetPath = join(scopeRoot, ".agents", "vibe", "routing.json");
+  // A hostile clone (or a symlinked container under the scope root) must never let a write
+  // land somewhere else — check every component from the scope root down, including a
+  // dangling symlink, before anything is read or written.
+  assertNoSymlink(join(scopeRoot, ".agents"));
+  assertNoSymlink(join(scopeRoot, ".agents", "vibe"));
+  assertNoSymlink(targetPath);
   const existing = readExistingRouting(targetPath);
 
   const resolvedProfile =
@@ -376,9 +441,12 @@ export function writeRouting({
   // Carry through any top-level key this tool doesn't know about — `file`'s known
   // keys still win (it's always the second, higher-precedence spread).
   const output = { ...(existing ?? {}), ...file };
+  if (scope === "user") {
+    delete output.project; // never valid at user scope — the resolver rejects it there
+  }
 
   mkdirSync(dirname(targetPath), { recursive: true });
-  writeFileSync(targetPath, `${JSON.stringify(output, null, 2)}\n`);
+  atomicWriteFile(targetPath, `${JSON.stringify(output, null, 2)}\n`);
   return targetPath;
 }
 
@@ -452,20 +520,10 @@ export function ensureAgentsCap({ codexConfigPath, maxParallel }) {
   if (hasSection) {
     return { action: "print", lines };
   }
-  let stat;
-  try {
-    stat = lstatSync(codexConfigPath);
-  } catch {
-    stat = null; // absent — nothing to refuse
-  }
-  if (stat && stat.isSymbolicLink()) {
-    throw new RoutingError(`refusing to write ${codexConfigPath}: it is a symlink`);
-  }
+  assertNoSymlink(codexConfigPath);
   mkdirSync(dirname(codexConfigPath), { recursive: true });
   const body = content === "" ? `${lines.join("\n")}\n` : `${content}\n${lines.join("\n")}\n`;
-  const tmpPath = `${codexConfigPath}.${process.pid}.${Date.now()}.tmp`;
-  writeFileSync(tmpPath, body);
-  renameSync(tmpPath, codexConfigPath);
+  atomicWriteFile(codexConfigPath, body);
   return { action: "appended", lines };
 }
 
@@ -644,8 +702,8 @@ function main() {
           throw new RoutingError("--max-parallel is required");
         }
         const maxParallel = Number(args.maxParallel);
-        if (!Number.isFinite(maxParallel)) {
-          throw new RoutingError(`--max-parallel: "${args.maxParallel}" is not a number`);
+        if (!Number.isInteger(maxParallel) || maxParallel < 1 || maxParallel > 32) {
+          throw new RoutingError(`--max-parallel must be an integer from 1 to 32 (got "${args.maxParallel}")`);
         }
         const codexConfigPath = args.codexConfig ?? join(homedir(), ".codex", "config.toml");
         const result = ensureAgentsCap({ codexConfigPath, maxParallel });

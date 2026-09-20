@@ -176,7 +176,7 @@ test("a routing error is reported inside the envelope, exit 0", () => {
     expect(r.status).toBe(0);
     const block = parseEnvelope(r.stdout).hookSpecificOutput.additionalContext;
     expect(block).toMatch(/^<VIBE_ROUTING host="claude" error="/);
-    expect(block).toContain('must use runtime "cross"');
+    expect(block).toContain('must use runtime cross');
     expect(block).toMatch(/<\/VIBE_ROUTING>\n?$/);
   } finally {
     h.cleanup();

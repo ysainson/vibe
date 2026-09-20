@@ -1,6 +1,6 @@
 import { test, expect } from "bun:test";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { makeHarness } from "./fixtures/harness";
 import { loadAdapters, resolveRouting } from "../plugins/vibe/scripts/routing.mjs";
@@ -612,6 +612,116 @@ test("a project-scope re-run with --profile keeps the hand-set project block", (
     expect(rerun().status).toBe(0);
     expect(readJson(projectFile(h)).project).toEqual({ ...withoutTest, test: "bun test" });
     expectNoNetworkAccess(h);
+  } finally {
+    h.cleanup();
+  }
+});
+
+test("write refuses a symlinked target or container", () => {
+  const h = makeHarness({ mode: "ok" });
+  const writeProject = () => run(h, ["write", "--host", "claude", "--scope", "project", "--cwd", h.project, "--yes"]);
+  const relRoutingPath = join(".agents", "vibe", "routing.json");
+  try {
+    // The routing file itself is a symlink pointing outside the project.
+    const victim = join(h.home, "victim.json");
+    writeFileSync(victim, '{"keep":true}');
+    symlinkSync(victim, projectFile(h));
+    const linkedFile = writeProject();
+    expect(linkedFile.status).toBe(2);
+    expect(linkedFile.stderr).toContain(relRoutingPath);
+    expect(readFileSync(victim, "utf8")).toBe('{"keep":true}');
+    unlinkSync(projectFile(h));
+
+    // The container directory is a symlink to a directory under HOME.
+    const evilDir = join(h.home, "evil-dir");
+    mkdirSync(evilDir);
+    rmSync(h.projectRoutingDir, { recursive: true, force: true });
+    symlinkSync(evilDir, h.projectRoutingDir);
+    const linkedDir = writeProject();
+    expect(linkedDir.status).toBe(2);
+    expect(linkedDir.stderr).toContain(join(".agents", "vibe"));
+    expect(readdirSync(evilDir)).toEqual([]);
+    unlinkSync(h.projectRoutingDir);
+
+    // A dangling symlink at the routing path: refused, and nothing appears at the target.
+    mkdirSync(h.projectRoutingDir, { recursive: true });
+    const nowhere = join(h.home, "nowhere.json");
+    symlinkSync(nowhere, projectFile(h));
+    const dangling = writeProject();
+    expect(dangling.status).toBe(2);
+    expect(dangling.stderr).toContain(relRoutingPath);
+    expect(existsSync(nowhere)).toBe(false);
+  } finally {
+    h.cleanup();
+  }
+});
+
+test("agents-cap preserves the config mode and leaves no temp file", () => {
+  const h = makeHarness();
+  try {
+    const before = 'api_key = "x"\n';
+    const codexConfigPath = h.writeCodexConfig(before);
+    chmodSync(codexConfigPath, 0o600);
+    expect(ensureAgentsCap({ codexConfigPath, maxParallel: 3 }).action).toBe("appended");
+    expect(statSync(codexConfigPath).mode & 0o777).toBe(0o600);
+    expect(readFileSync(codexConfigPath, "utf8")).toBe(before + "\n[agents]\nmax_concurrent_threads_per_session = 6\n");
+    expect(readdirSync(join(h.home, ".codex"))).toEqual(["config.toml"]);
+
+    // A file agents-cap creates itself is private too.
+    const fresh = join(h.home, "fresh", "config.toml");
+    expect(ensureAgentsCap({ codexConfigPath: fresh, maxParallel: 3 }).action).toBe("appended");
+    expect(statSync(fresh).mode & 0o777).toBe(0o600);
+    expect(readdirSync(join(h.home, "fresh"))).toEqual(["config.toml"]);
+  } finally {
+    h.cleanup();
+  }
+});
+
+test("init never echoes file content in a JSON error", () => {
+  const h = makeHarness({ mode: "ok" });
+  try {
+    writeFileSync(userFile(h), "not json AWS_SECRET_xyz");
+    const result = run(h, ["write", "--host", "claude", "--scope", "user", "--yes"]);
+    expect(result.status).toBe(2);
+    expect(result.stderr).toContain(join(".agents", "vibe", "routing.json"));
+    expect(result.stderr).not.toContain("AWS_SECRET");
+    expect(result.stdout).not.toContain("AWS_SECRET");
+    // The unreadable file is left alone rather than overwritten.
+    expect(readFileSync(userFile(h), "utf8")).toBe("not json AWS_SECRET_xyz");
+  } finally {
+    h.cleanup();
+  }
+});
+
+test("agents-cap validates --max-parallel as an integer in 1..32", () => {
+  const h = makeHarness();
+  try {
+    const before = "[other]\nfoo = 1\n";
+    const codexConfigPath = h.writeCodexConfig(before);
+    for (const bad of ["1e308", "-1", "0", "2.5", "33"]) {
+      const result = run(h, ["agents-cap", "--max-parallel", bad, "--codex-config", codexConfigPath]);
+      expect(result.status).toBe(2);
+      expect(result.stderr).toContain("--max-parallel");
+      expect(readFileSync(codexConfigPath, "utf8")).toBe(before);
+    }
+    const ok = run(h, ["agents-cap", "--max-parallel", "3", "--codex-config", codexConfigPath]);
+    expect(ok.status).toBe(0);
+    expect(readFileSync(codexConfigPath, "utf8")).toBe(before + "\n[agents]\nmax_concurrent_threads_per_session = 6\n");
+  } finally {
+    h.cleanup();
+  }
+});
+
+test("a user-scope write never carries a project key", () => {
+  const h = makeHarness({ mode: "ok" });
+  try {
+    // A hand-added project block at user scope would make the resolver reject the file.
+    h.writeUserRouting({ version: 1, profile: "tiered", project: { install: "x" }, custom_note: "keep" });
+    expect(run(h, ["write", "--host", "claude", "--scope", "user", "--yes"]).status).toBe(0);
+    const file = readJson(userFile(h));
+    expect(file).not.toHaveProperty("project");
+    expect(file.custom_note).toBe("keep");
+    expect(resolve(h, { host: "claude" }).profile).toBe("tiered");
   } finally {
     h.cleanup();
   }

@@ -1,6 +1,6 @@
 import { test, expect } from "bun:test";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { isStableTag } from "./pins";
@@ -706,5 +706,155 @@ test("profile is a name, not a path", () => {
     expect(message).not.toContain("secret");
   } finally {
     rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// --- Security round 2: bounds, unicode, field types, numeric ranges ---
+
+const hookPath = join(root, "plugins", "vibe", "hooks", "resolve-routing.mjs");
+const projectLineOf = (block: string): string => {
+  const line = block.trimEnd().split("\n").find((l) => l.startsWith("project: "));
+  expect(line).toBeDefined();
+  return line as string;
+};
+// A lone surrogate half (a pair cut in the middle), as opposed to a valid astral pair.
+const LONE_SURROGATE = /[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/;
+
+test("block values are bounded and unicode-safe", () => {
+  const h = makeHarness();
+  try {
+    // Arrays are capped at 32 entries of at most 120 chars each; the whole line at 600.
+    h.writeProjectRouting({ version: 1, profile: "tiered", project: { disposable_paths: Array(500).fill("a".repeat(120)) } });
+    expect(() => resolve(h, { host: "claude" })).toThrow(RoutingError);
+    h.writeProjectRouting({ version: 1, profile: "tiered", project: { disposable_paths: Array(33).fill("x") } });
+    expect(() => resolve(h, { host: "claude" })).toThrow(RoutingError);
+    h.writeProjectRouting({ version: 1, profile: "tiered", project: { secret_allowlist: Array(33).fill("x") } });
+    expect(() => resolve(h, { host: "claude" })).toThrow(RoutingError);
+    h.writeProjectRouting({ version: 1, profile: "tiered", project: { disposable_paths: Array(32).fill("x") } });
+    expect(resolve(h, { host: "claude" }).project?.disposable_paths).toHaveLength(32);
+    // Within the array caps but over the line cap: either rejected or bounded, never longer.
+    h.writeProjectRouting({ version: 1, profile: "tiered", project: { disposable_paths: Array(8).fill("b".repeat(120)) } });
+    try {
+      const line = projectLineOf(formatMarkdown(resolve(h, { host: "claude" })));
+      expect(line.length).toBeLessThanOrEqual(600);
+    } catch (e) {
+      expect(e).toBeInstanceOf(RoutingError);
+    }
+
+    // Line/paragraph separators, bidi override, zero-width space and fullwidth
+    // delimiters are stripped from a command string; a double quote too.
+    const tricky = "bun test --x‮​＜＞｜";
+    h.writeProjectRouting({ version: 1, profile: "tiered", project: { test: tricky, install: 'echo "hi"' } });
+    const line = projectLineOf(formatMarkdown(resolve(h, { host: "claude" })));
+    for (const ch of [" ", " ", "‮", "​", "＜", "＞", "｜"]) {
+      expect(line).not.toContain(ch);
+    }
+    expect(line).toContain("bun");
+    expect(line).toContain("test");
+    expect(line.match(/"/g)?.length).toBe(4); // exactly the install="…" test="…" delimiters
+    expect(line).toContain("echo hi");
+
+    // A 121-char value ending in an astral emoji is cut without leaving a lone surrogate.
+    h.writeProjectRouting({ version: 1, profile: "tiered", project: { install: `${"a".repeat(119)}\u{1F600}` } });
+    const cut = formatMarkdown(resolve(h, { host: "claude" }));
+    expect(cut).not.toMatch(LONE_SURROGATE);
+    expect(projectLineOf(cut)).toContain("a".repeat(119));
+
+    // The opening tag keeps exactly its three attributes even when cwd carries a quote.
+    const quoted = join(h.root, 'pro"ject');
+    mkdirSync(join(quoted, ".agents", "vibe"), { recursive: true });
+    writeFileSync(join(quoted, ".agents", "vibe", "routing.json"), JSON.stringify({ version: 1, profile: "tiered" }));
+    const tagged = formatMarkdown(resolveRouting({ host: "claude", cwd: quoted, home: h.home }));
+    const first = tagged.split("\n")[0];
+    expect(first).toMatch(/^<VIBE_ROUTING host="[^"]*" profile="[^"]*" source="[^"]*">$/);
+    expect(first).toContain('profile="tiered"');
+    expect(first).toContain('source="project:');
+  } finally {
+    h.cleanup();
+  }
+});
+
+test("a model may not start with a dash", () => {
+  const h = makeHarness();
+  try {
+    expect(() => resolve(h, { host: "claude", profile: "tiered", sets: ["doer=claude:--dangerously-skip-permissions"] })).toThrow(
+      RoutingError,
+    );
+    expect(() => resolve(h, { host: "claude", profile: "tiered", sets: ["doer=claude:-x"] })).toThrow(RoutingError);
+    h.writeUserRouting({
+      version: 1,
+      profile: "tiered",
+      roles: { doer: { runtime: "claude", model: "--dangerously-skip-permissions" } },
+    });
+    expect(() => resolve(h, { host: "claude" })).toThrow(RoutingError);
+    h.writeUserRouting({ version: 1, profile: "tiered", roles: { doer: { runtime: "claude", model: "claude-3.5" } } });
+    expect(resolve(h, { host: "claude" }).roles.doer.model).toBe("claude-3.5");
+    expect(resolve(h, { host: "claude", sets: ["doer=claude:claude-3.5"] }).roles.doer.model).toBe("claude-3.5");
+  } finally {
+    h.cleanup();
+  }
+});
+
+test("the project block's field types are validated", () => {
+  const h = makeHarness();
+  try {
+    const cases: Array<[string, Record<string, unknown>]> = [
+      ["disposable_paths", { disposable_paths: "x" }],
+      ["install", { install: 5 }],
+      ["secret_allowlist", { secret_allowlist: [1] }],
+      ["env_passthrough", { env_passthrough: "A" }],
+    ];
+    for (const [key, project] of cases) {
+      h.writeProjectRouting({ version: 1, profile: "tiered", project });
+      expect(() => resolve(h, { host: "claude" })).toThrow(RoutingError);
+      expect(() => resolve(h, { host: "claude" })).toThrow(new RegExp(key));
+    }
+
+    // The hook folds it as a routing error, never as an internal crash.
+    h.writeProjectRouting({ version: 1, profile: "tiered", project: { disposable_paths: "x" } });
+    const r = spawnSync(process.execPath, [hookPath, "--host", "claude"], {
+      cwd: h.project,
+      env: { ...h.env, CLAUDE_PLUGIN_ROOT: join(root, "plugins", "vibe") },
+      encoding: "utf8",
+    });
+    expect(r.status).toBe(0);
+    const context = JSON.parse(r.stdout).hookSpecificOutput.additionalContext as string;
+    expect(context).toMatch(/^<VIBE_ROUTING host="claude" error="routing">/);
+    expect(context).toContain("disposable_paths");
+  } finally {
+    h.cleanup();
+  }
+});
+
+test("numeric knobs are integers in range", () => {
+  const h = makeHarness();
+  try {
+    const rejected: Array<Record<string, number>> = [
+      { max_parallel: 1e308 },
+      { max_parallel: 0 },
+      { max_parallel: 33 },
+      { task_budget_minutes: -1 },
+      { task_budget_minutes: 1441 },
+      { task_idle_minutes: 2.5 },
+      { task_idle_minutes: 1441 },
+    ];
+    for (const knobs of rejected) {
+      h.writeUserRouting({ version: 1, profile: "tiered", ...knobs });
+      expect(() => resolve(h, { host: "claude" })).toThrow(RoutingError);
+      const [key, value] = Object.entries(knobs)[0];
+      h.writeUserRouting({ version: 1, profile: "tiered" });
+      expect(() => resolve(h, { host: "claude", sets: [`${key}=${value}`] })).toThrow(RoutingError);
+    }
+
+    // The boundaries are values, not errors: 0 minutes is valid per the spec.
+    h.writeUserRouting({ version: 1, profile: "tiered", max_parallel: 1, task_budget_minutes: 0, task_idle_minutes: 0 });
+    let r = resolve(h, { host: "claude" });
+    expect([r.max_parallel, r.task_budget_minutes, r.task_idle_minutes]).toEqual([1, 0, 0]);
+    h.writeUserRouting({ version: 1, profile: "tiered", max_parallel: 32, task_budget_minutes: 1440, task_idle_minutes: 1440 });
+    r = resolve(h, { host: "claude" });
+    expect([r.max_parallel, r.task_budget_minutes, r.task_idle_minutes]).toEqual([32, 1440, 1440]);
+    expect(resolve(h, { host: "claude", sets: ["task_budget_minutes=0"] }).task_budget_minutes).toBe(0);
+  } finally {
+    h.cleanup();
   }
 });

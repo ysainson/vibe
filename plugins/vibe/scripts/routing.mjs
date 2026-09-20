@@ -129,11 +129,29 @@ const NUMERIC_FIELDS = ["max_parallel", "task_budget_minutes", "task_idle_minute
 const EGRESS_PROVIDERS = ["openai", "anthropic"];
 const EGRESS_CLASSES = ["review", "doer"];
 
-// A model is a name (an identifier passed to a runtime), not free text.
-const MODEL_PATTERN = /^[A-Za-z0-9.:-]{1,64}$/;
+// A model is a name (an identifier passed to a runtime), not free text — and
+// never dash-led, so it can't be smuggled as a CLI flag (`--dangerously-skip-permissions`).
+const MODEL_PATTERN = /^[A-Za-z0-9][A-Za-z0-9.:-]{0,63}$/;
 // A preset name is joined into a filesystem path — restrict it to a bare
 // lowercase identifier so it can never traverse out of the presets dir.
 const PRESET_NAME_PATTERN = /^[a-z0-9][a-z0-9-]*$/;
+
+// Integer bounds for the numeric run knobs, checked wherever they're read
+// (a routing file's own value, or a `--set`-supplied override).
+const NUMERIC_FIELD_RANGES = {
+  max_parallel: [1, 32],
+  task_budget_minutes: [0, 1440],
+  task_idle_minutes: [0, 1440],
+};
+
+// The `project` block's two free-text keys and its three list keys, and the
+// bounds that keep an attacker-controlled project file from ballooning the
+// injected block (unbounded prose × unbounded entries).
+const PROJECT_STRING_KEYS = ["install", "test"];
+const PROJECT_LIST_KEYS = ["disposable_paths", "env_passthrough", "secret_allowlist"];
+const MAX_PROJECT_LIST_ENTRIES = 32;
+const MAX_PROJECT_ENTRY_CHARS = 120;
+const MAX_PROJECT_LINE_CHARS = 600;
 
 const CLAUDE_NATIVE_OVERRIDE_NOTE =
   "claude: a dispatch model beats CLAUDE_CODE_SUBAGENT_MODEL unless CLAUDE_CODE_SUBAGENT_MODEL_FORCE=1";
@@ -176,25 +194,46 @@ function validateFileModel(role, model, context) {
   }
 }
 
+/** A numeric knob (from a routing file or `--set`) — an integer within `NUMERIC_FIELD_RANGES[key]`. */
+function validateNumericKnob(key, value, context) {
+  const [min, max] = NUMERIC_FIELD_RANGES[key];
+  if (typeof value !== "number" || !Number.isInteger(value) || value < min || value > max) {
+    throw new RoutingError(`${context}: "${key}" must be an integer between ${min} and ${max}`);
+  }
+}
+
+// Unicode format/control/separator characters — C0/C1 controls, zero-width
+// joiners, bidi overrides/isolates, a BOM, U+2028/U+2029 — become a space, the
+// same treatment a literal newline gets. ASCII/fullwidth structural
+// characters (quote, angle brackets, pipe, and their fullwidth lookalikes)
+// are dropped outright: nothing legitimate needs them in this block.
+const BLOCK_FORMAT_CHARS = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu;
+const BLOCK_STRUCTURE_CHARS = /["<>|＜＞｜]/g;
+
+/** Truncate to at most `max` Unicode code points (not UTF-16 code units) — never splits a surrogate pair. */
+function truncateCodePoints(text, max) {
+  return [...text].slice(0, max).join("");
+}
+
 /**
  * Make a file-derived string safe to interpolate into the `<VIBE_ROUTING>`
  * block: every value read from a routing file (or a Codex config, for a
  * hook-side caller) is untrusted and must never be able to forge a fake
- * `</VIBE_ROUTING>` close, a fake table row, or control-character noise.
- * Strips control characters, drops `<`/`>`/`|` (the block/row delimiters),
- * collapses whitespace runs, and caps the result at 120 characters. Exported
- * so `resolve-routing.mjs` (the SessionStart hook) can apply the same rule
- * to `RoutingError` messages it folds into the block.
+ * `</VIBE_ROUTING>` close, a fake table row, control-character noise, or a
+ * bidi/zero-width rendering trick. Collapses whitespace runs and caps the
+ * result at 120 Unicode code points. Exported so `resolve-routing.mjs` (the
+ * SessionStart hook) can apply the same rule to `RoutingError` messages it
+ * folds into the block.
  *
  * @param {string} text
  * @returns {string}
  */
 export function sanitizeForBlock(text) {
-  return String(text)
-    .replace(/[\x00-\x1f\x7f]/g, " ")
-    .replace(/[<>|]/g, "")
-    .replace(/ {2,}/g, " ")
-    .slice(0, 120);
+  const cleaned = String(text)
+    .replace(BLOCK_FORMAT_CHARS, " ")
+    .replace(BLOCK_STRUCTURE_CHARS, "")
+    .replace(/ {2,}/g, " ");
+  return truncateCodePoints(cleaned, 120);
 }
 
 /** An `egress` block's shape: only `openai`/`anthropic` keys, only `review`/`doer` classes. */
@@ -208,6 +247,42 @@ function validateEgressAck(egress, context) {
     }
     if (!Array.isArray(classes) || classes.some((c) => !EGRESS_CLASSES.includes(c))) {
       throw new RoutingError(`egress.${provider} (${context}): classes must be "review" or "doer"`);
+    }
+  }
+}
+
+/**
+ * The `project` block's shape: `install`/`test` are strings if present, the
+ * three list keys are arrays of strings if present, each capped at
+ * `MAX_PROJECT_LIST_ENTRIES` entries of at most `MAX_PROJECT_ENTRY_CHARS`
+ * characters. An unbounded project file must never be able to balloon the
+ * injected block — this is the reject-outright half; `formatMarkdown` still
+ * truncates (never throws) the composed line as a backstop.
+ */
+function validateProjectBlock(project, context) {
+  if (typeof project !== "object" || project === null || Array.isArray(project)) {
+    throw new RoutingError(`project (${context}): must be an object`);
+  }
+  for (const key of PROJECT_STRING_KEYS) {
+    if (project[key] !== undefined && typeof project[key] !== "string") {
+      throw new RoutingError(`project.${key} (${context}): must be a string`);
+    }
+  }
+  for (const key of PROJECT_LIST_KEYS) {
+    const list = project[key];
+    if (list === undefined) {
+      continue;
+    }
+    if (!Array.isArray(list) || list.some((v) => typeof v !== "string")) {
+      throw new RoutingError(`project.${key} (${context}): must be an array of strings`);
+    }
+    if (list.length > MAX_PROJECT_LIST_ENTRIES) {
+      throw new RoutingError(`project.${key} (${context}): at most ${MAX_PROJECT_LIST_ENTRIES} entries`);
+    }
+    if (list.some((v) => v.length > MAX_PROJECT_ENTRY_CHARS)) {
+      throw new RoutingError(
+        `project.${key} (${context}): each entry is at most ${MAX_PROJECT_ENTRY_CHARS} characters`,
+      );
     }
   }
 }
@@ -313,6 +388,7 @@ export function parseSet(text) {
     if (value === "" || !Number.isFinite(num)) {
       throw new RoutingError(`invalid --set "${text}": "${value}" is not a number`);
     }
+    validateNumericKnob(key, num, `--set "${text}"`);
     return { kind: "field", field: key, value: num };
   }
   if (!ROLES.includes(key)) {
@@ -328,11 +404,12 @@ export function parseSet(text) {
 
 /**
  * Parse a project/user routing file: validates the `project` block is only
- * present where allowed, that any `egress` block and `roles` keys are
- * well-formed, and that any numeric knob is a finite number. Returns the
- * parsed JSON, or `null` only when the file is genuinely absent (`ENOENT`) —
- * any other read failure (permissions, a directory in its place, ...) is a
- * `RoutingError` naming the path, not a silent "no file".
+ * present where allowed (and, where it is, that its own shape and bounds
+ * hold), that any `egress` block and `roles` keys are well-formed, and that
+ * any numeric knob is an in-range integer. Returns the parsed JSON, or `null`
+ * only when the file is genuinely absent (`ENOENT`) — any other read failure
+ * (permissions, a directory in its place, ...) is a `RoutingError` naming the
+ * path, not a silent "no file".
  */
 function loadRoutingFile(path, { allowProject }) {
   let raw;
@@ -354,6 +431,9 @@ function loadRoutingFile(path, { allowProject }) {
   if (!allowProject && data.project !== undefined) {
     throw new RoutingError(`routing file ${path}: "project" is only allowed in the project-scope routing file`);
   }
+  if (data.project !== undefined) {
+    validateProjectBlock(data.project, path);
+  }
   if (data.egress !== undefined) {
     validateEgressAck(data.egress, path);
   }
@@ -365,8 +445,8 @@ function loadRoutingFile(path, { allowProject }) {
     }
   }
   for (const key of NUMERIC_FIELDS) {
-    if (data[key] !== undefined && (typeof data[key] !== "number" || !Number.isFinite(data[key]))) {
-      throw new RoutingError(`routing file ${path}: "${key}" must be a finite number`);
+    if (data[key] !== undefined) {
+      validateNumericKnob(key, data[key], `routing file ${path}`);
     }
   }
   return data;
@@ -722,10 +802,13 @@ export function formatMarkdown(resolved) {
     const test = sanitizeForBlock(p.test);
     const disposablePaths = fmtList(p.disposable_paths.map(sanitizeForBlock));
     const secretAllowlist = fmtList(p.secret_allowlist.map(sanitizeForBlock));
-    lines.push(
+    const projectLine =
       `project: install="${install}" test="${test}" ` +
-        `disposable_paths=${disposablePaths} secret_allowlist=${secretAllowlist}`,
-    );
+      `disposable_paths=${disposablePaths} secret_allowlist=${secretAllowlist}`;
+    // The per-list caps in validateProjectBlock (32 entries × 120 chars) reject
+    // outright; this is the backstop for what still fits within those caps but
+    // adds up across install/test/both lists — truncate, never throw, here.
+    lines.push(truncateCodePoints(projectLine, MAX_PROJECT_LINE_CHARS));
   }
   lines.push(`native-overrides: ${resolved.nativeOverrides}`);
   lines.push("</VIBE_ROUTING>");
