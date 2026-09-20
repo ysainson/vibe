@@ -2,8 +2,10 @@ import { test, expect } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-// Contract for /vibe:review's optional final-diff cross-model check
-// (docs/specs/2026-07-17-codex-overlay-and-routing-coverage.md, section D).
+// Contract for /vibe:review — models come from the injected routing block
+// (roles.cross-check / adversarial / guardians), the optional final-diff
+// cross-model check, and the `/vibe:review adversarial` form
+// (docs/specs/2026-09-04-multi-runtime-vibe.md, section D and contract 6).
 const root = join(import.meta.dir, "..");
 
 const review = () =>
@@ -25,14 +27,43 @@ test("egress guard: consent, then secrets pre-scan, before any dispatch", () => 
   expect(body).toMatch(/secrets? pre-scan/);
 });
 
+test("secrets pre-scan reads the shared secret-patterns.json", () => {
+  const body = review();
+  expect(body.toLowerCase()).toMatch(/secrets? pre-scan/);
+  expect(body).toContain("secret-patterns.json");
+});
+
 test("dispatch uses the review subcommand with the working-tree/base rule", () => {
   const body = review();
   expect(body).toContain("--scope working-tree");
   expect(body).toContain("--base");
 });
 
-test("model expectation on the native-review path derives from review_model first", () => {
-  expect(review()).toContain("review_model");
+test("dispatch models come from the routing block's cross-check, adversarial, and guardians rows", () => {
+  const body = review();
+  expect(body).toMatch(/VIBE_ROUTING|routing/i);
+  expect(body).toMatch(/`(roles\.)?cross-check`/);
+  expect(body).toMatch(/`(roles\.)?adversarial`/);
+  expect(body).toMatch(/`(roles\.)?guardians`/);
+  expect(body).not.toContain("PROFILE");
+});
+
+test("review_model is gone — model expectation is config-owned", () => {
+  expect(review()).not.toContain("review_model");
+});
+
+test("`/vibe:review adversarial` runs adversarial-review on the working tree or against the base", () => {
+  const body = review();
+  expect(body).toContain("/vibe:review adversarial");
+  expect(body).toContain("adversarial-review");
+  expect(body).toContain("--scope working-tree");
+  expect(body).toContain("--base");
+});
+
+test("default branch comes from origin/HEAD, falling back to main", () => {
+  const body = review();
+  expect(body).toContain("git symbolic-ref refs/remotes/origin/HEAD");
+  expect(body).toMatch(/fall(s|ing)?\s*back\s+(to\s+)?`?main`?/i);
 });
 
 test("background launch with a numbered collection step and timeout recovery", () => {

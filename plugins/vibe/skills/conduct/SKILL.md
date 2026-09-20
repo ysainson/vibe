@@ -12,26 +12,17 @@ This flow **wraps [superpowers](https://github.com/obra/superpowers)** — it is
 
 ## Model routing
 
-`PROFILE: tiered`
+Routing is read from the `<VIBE_ROUTING>` block the SessionStart hook injects into context — one row per role (role, runtime, adapter, model, effort, source) plus the run-level lines. If the block is missing (session started before the hook ran, or hook failed), fall back to running the resolver directly: `node "${CLAUDE_PLUGIN_ROOT}/scripts/routing.mjs" resolve --host claude --markdown`.
 
-| Role | Agent | tiered | uniform |
-|------|-------|--------|---------|
-| Implementation | `vibe:doer` | sonnet | inherit |
-| Mechanical edits | `vibe:doer-mechanical` | haiku | inherit |
-| Escalation | `vibe:doer` | opus | inherit |
-| Exploration | `Explore` (built-in) | sonnet | inherit |
-| Contract writing | `vibe:contract-writer` | inherit | inherit |
-| Spec-compliance review | `vibe:reviewer-spec` | opus | inherit |
-| Code-quality review | `vibe:reviewer-quality` | opus | inherit |
-| Final verification | `vibe:verifier` | opus | inherit |
-| Security verification | `vibe:security-verifier` | opus | inherit |
-| Overlay guardians & project-local review | *(by stack, discovered at dispatch)* | opus | inherit |
+Each role binds to a fixed agent id: `doer` and `escalation` → `vibe:doer` (escalation at the escalation row's model); `doer-mechanical` → `vibe:doer-mechanical`; `exploration` → the built-in `Explore` agent; `contract-writer` → `vibe:contract-writer`; `reviewer-spec`, `reviewer-quality`, `verifier`, `security-verifier` → the agents of the same name; `guardians` → overlay and project-local agents discovered at dispatch, taking the `guardians` row. Each dispatch takes its `model` from the matching role's row, omitted entirely when the row's value is `default` (session model); guardian agents fall back to their own frontmatter (`model: inherit` or similar) for dispatches that bypass VIBE's flows and read no routing block.
 
-Dispatch each agent with the model override from the active profile column. `inherit` means the session model. Effort is not routed here: every agent pins `effort: high` in its own frontmatter, so the session effort setting steers only the orchestrator (see `vibe:profile-policy`). The flow is model-agnostic: if the session model changes (Fable 5, Opus 4.8, ...), nothing here changes. Switch `PROFILE` to `uniform` to run every role on the session model — for when cost-tiering isn't wanted or smaller models aren't available. The skill argument overrides the profile for one run (`/vibe:conduct uniform ...`). The policy and the global Opus↔Fable switch live in `vibe:profile-policy`; this table is the operational source.
+A role whose row resolves to the `codex` runtime is dispatched on that role's host-native agent instead, and the substitution is reported; codex-runtime dispatch lands in phase 2 (spec section E).
 
-The table binds every dispatch mechanism, not just the Agent tool. If any phase runs through the Workflow tool (ultracode, or an explicit workflow request), workflow `agent()` calls inherit the session model unless told otherwise — carry the profile override as each call's `model` option and name the role with `agentType`. Self-check before launching a workflow script: no `agent()` call for a non-`inherit` role omits `model`.
+One-run override: `/vibe:conduct <preset> ...` sets the profile for this run; `role=runtime[:model[:effort]]` arguments override a single row the same way. Precedence across argument, project file, user file, and preset is defined in `vibe:profile-policy`.
 
-Exploration dispatches (codebase search/summarize fan-outs) take the profile's model as the per-invocation override, exactly like doers; the orchestrator still verifies load-bearing claims itself. Overlay guardians and project-local review agents take the Guardians row's override at dispatch, exactly like the named roles; their `model: inherit` frontmatter is the fallback for dispatches that bypass VIBE's flows. This table also routes the review dispatches in `/vibe:review` and `/vibe:quick-check` — those commands carry the review-tier override too.
+The flow is model-agnostic: routing is config, not prose — changing models or runtimes is an edit to `routing.json`, never to this skill.
+
+Routing binds every dispatch mechanism, not just the Agent tool. If any phase runs through the Workflow tool (ultracode, or an explicit workflow request), workflow `agent()` calls inherit the session model unless told otherwise — carry the routing row's `model` as each call's `model` option and name the role with `agentType`. Self-check before launching a workflow script: no `agent()` call for a non-`default` role omits `model`.
 
 Escalation means: a subtask failed two review redirects, or is genuinely hard in isolation (deep debugging, a complex algorithm) and worth a stronger doer from the start.
 
@@ -49,7 +40,7 @@ These bind every spec, plan, and dispatch unless the spec explicitly overrides t
 
 1. **Spec.** If the request is underspecified in ways that change the outcome, ask before building — via the AskUserQuestion tool; the `vibe:clarify` skill defines the bar for asking vs proceeding. If a spec already exists under `docs/specs/`, read it and confirm it still holds; otherwise state your assumptions and proceed. Write verifiable success criteria — things a test or command can check.
 
-2. **Contract.** Tests first, before any implementation is dispatched, and confirm they fail. The failing test is the gate: no implementation begins until the contract exists and is red. You own the tests: write them yourself or dispatch test-writing to `vibe:contract-writer` at the contract-writing tier — carry the contract-writer block from [guardrails.md](guardrails.md), verbatim — and review the result against the spec. Tests validate contracts, not implementations. Doers never touch test files — state it in every dispatch, check it in every review. Use the `test-driven-development` skill for the RED→GREEN→REFACTOR inner loop each doer runs.
+2. **Contract.** Tests first, before any implementation is dispatched, and confirm they fail. The failing test is the gate: no implementation begins until the contract exists and is red. You own the tests: write them yourself or dispatch test-writing to `vibe:contract-writer` at the `contract-writer` row's model — carry the contract-writer block from [guardrails.md](guardrails.md), verbatim — and review the result against the spec. Tests validate contracts, not implementations. Doers never touch test files — state it in every dispatch, check it in every review. Use the `test-driven-development` skill for the RED→GREEN→REFACTOR inner loop each doer runs.
 
 3. **Plan.** Use the `writing-plans` skill to turn the spec into a numbered, commit-per-task plan under `docs/plans/` — each task with its exact files, the command to run, and the test that proves it. The plan is the durable trail and the dispatch backlog. Skip only for changes small enough that a plan would cost more than the work.
 
@@ -64,6 +55,6 @@ These bind every spec, plan, and dispatch unless the spec explicitly overrides t
 
 5. **Review — every diff, two passes.** Read every returned diff yourself against contract, scope, and conventions — this is non-optional. Diff against a pre-dispatch baseline (`git add -A` or a stash before dispatching) — plain `git diff` misses files the doer created. For any non-trivial subtask, run the two-stage review the `requesting-code-review` / `receiving-code-review` skills frame, but keep it as **two separate passes**: dispatch `vibe:reviewer-spec` (does it meet the contract and spec, nothing gamed?) and `vibe:reviewer-quality` (is the code well-made?). Also dispatch the enabled stack overlay's guardians that match the changed files, per `/vibe:review`'s overlay table. The split is deliberate — a blended review is easier to game. Verdict per subtask: accept; redirect with specific, actionable feedback (say what acceptance looks like, not "try again"); or escalate the model tier after two failed redirects.
 
-6. **Verify — independent, fresh context.** Run the project's full check suite yourself (tests, lint, typecheck — whatever the project defines). Then dispatch `vibe:verifier` with the spec and the final diff only — never the implementation history; its value is having no stake in the work. This is a separate pass from review: the reviewers were inside the loop, the verifier is not. Add `vibe:security-verifier` when the change touches auth, user-input handling, endpoints, storage of user data, secrets/config, or dependencies. A FAIL verdict goes back to dispatch/review — refute it with evidence or fix it, never argue it away. For a high-stakes change, run the optional cross-model check from `/vibe:review` on the final diff — never per-subtask.
+6. **Verify — independent, fresh context.** Run the project's full check suite yourself (tests, lint, typecheck — whatever the project defines). Then dispatch `vibe:verifier` with the spec and the final diff only — never the implementation history; its value is having no stake in the work. This is a separate pass from review: the reviewers were inside the loop, the verifier is not. Add `vibe:security-verifier` when the change touches auth, user-input handling, endpoints, storage of user data, secrets/config, or dependencies. A FAIL verdict goes back to dispatch/review — refute it with evidence or fix it, never argue it away. Optionally run the cross-model check: run `/vibe:review adversarial` (the `adversarial` role) on the final diff — it carries the consent and secrets pre-scan contract — for a high-stakes change or on request, never per-subtask.
 
 7. **Finish & report.** Once verification passes, use the `finishing-a-development-branch` skill to wrap the branch (commits, merge/PR, cleanup). Then report: outcome first. Every claim backed by a tool result from this session; anything unverified is labeled as such.

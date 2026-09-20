@@ -82,12 +82,19 @@ test("asserts readiness and a config-derived model expectation before dispatch",
   expect(body.toLowerCase()).toContain("model expectation");
 });
 
-test("dispatches read-only at explicit high effort, in the background, with consent", () => {
-  const body = src();
-  expect(body).toContain("--effort xhigh");
-  expect(body).toContain("no `--model`");
-  expect(body.toLowerCase()).toContain("consent");
-  expect(body.toLowerCase()).toContain("background");
+// Step 3 is config-owned (docs/specs/2026-09-04-multi-runtime-vibe.md, section
+// D): effort and model come from the routing block's `plan-check` row and are
+// passed only when the row's value is not `default`.
+const step3 = (s: string) => s.match(/## Step 3[\s\S]*?(?=\n## Step )/)?.[0] ?? "";
+
+test("dispatches read-only with plan-check's effort and model, in the background, with consent", () => {
+  const step = step3(src());
+  expect(step).toMatch(/`(roles\.)?plan-check`/);
+  expect(step).toContain("--effort");
+  expect(step).toContain("--model");
+  expect(step).toContain("`default`");
+  expect(step.toLowerCase()).toContain("consent");
+  expect(step.toLowerCase()).toContain("background");
 });
 
 test("the report never claims the model that actually ran", () => {
