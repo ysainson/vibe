@@ -414,11 +414,18 @@ test("CLI: detect --json exits 0 with the detection, write without --yes exits 2
   }
 });
 
-test("bridges runs the missing commands unless --dry-run", () => {
-  // Claude host, no codex@ysainson entry: the one install runs through the fake `claude`.
+test("bridges runs the missing commands only with --yes", () => {
+  // Claude host, no codex@ysainson entry. Without --yes the command only prints (like --dry-run):
+  // the lines are on stdout and nothing reaches the fake `claude`.
   const claudeHost = makeHarness({ mode: "ok" });
   try {
-    const result = run(claudeHost, ["bridges", "--host", "claude"]);
+    const printed = run(claudeHost, ["bridges", "--host", "claude"]);
+    expect(printed.status).toBe(0);
+    expect(printed.stdout.trimEnd().split("\n")).toEqual(CLAUDE_HOST_COMMANDS);
+    expect(claudeHost.calls().filter((c) => c.argv.includes("install") || c.argv.includes("add"))).toEqual([]);
+
+    // With --yes the one install runs through the fake `claude`.
+    const result = run(claudeHost, ["bridges", "--host", "claude", "--yes"]);
     expect(result.status).toBe(0);
     const installs = claudeHost.calls().filter((c) => c.argv.includes("install"));
     expect(installs.map((c) => c.argv)).toEqual([["plugin", "install", "codex@ysainson"]]);
@@ -426,12 +433,12 @@ test("bridges runs the missing commands unless --dry-run", () => {
     claudeHost.cleanup();
   }
 
-  // Codex host, nothing installed: the three installs run in order through the fake `codex`,
+  // Codex host, nothing installed: with --yes the three installs run in order through the fake `codex`,
   // and the $cc:setup reminder still closes stdout (the fake exits 0 for unknown subcommands,
   // so the calls log is the evidence).
   const codexHost = makeHarness({ mode: "ok" });
   try {
-    const result = run(codexHost, ["bridges", "--host", "codex"]);
+    const result = run(codexHost, ["bridges", "--host", "codex", "--yes"]);
     expect(result.status).toBe(0);
     const ran = codexHost.calls().filter((c) => c.argv.includes("add") || c.argv.includes("install"));
     expect(ran.map((c) => c.argv)).toEqual([

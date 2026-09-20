@@ -15,7 +15,15 @@
  * plugin (and this process isn't itself a spawned runtime job), it fires a
  * detached `reap` pass over `~/.agents/vibe/jobs` and forgets about it —
  * nothing from that child reaches this hook's stdout/stderr. The script is
- * optional and the reaper is skipped when it's absent.
+ * optional and the reaper is skipped when it's absent. Its path is derived
+ * only from this file's own location — never from `CLAUDE_PLUGIN_ROOT` /
+ * `PLUGIN_ROOT`, which a hostile environment could point at arbitrary code.
+ *
+ * Any error message folded into the block (a `RoutingError` or an internal
+ * failure) is run through `sanitizeForBlock` first, since it can carry
+ * file-derived text (e.g. a hostile `profile` value): control characters
+ * become spaces, `<`/`>`/`|` are dropped, runs of whitespace collapse to one
+ * space, and the result is capped at 120 characters on a single line.
  *
  *   node resolve-routing.mjs --host claude|codex
  */
@@ -24,7 +32,7 @@ import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { resolveRouting, formatMarkdown, RoutingError } from "../scripts/routing.mjs";
+import { resolveRouting, formatMarkdown, RoutingError, sanitizeForBlock } from "../scripts/routing.mjs";
 
 const HOOK_DIR = dirname(fileURLToPath(import.meta.url));
 
@@ -34,10 +42,9 @@ function parseHost(argv) {
   return i === -1 ? undefined : argv[i + 1];
 }
 
-/** Spawn the phase 2 reaper, detached and silent, when its script exists and we're not already inside one. */
+/** Spawn the phase 2 reaper, detached and silent, when its script exists and we're not already inside one. The job path is resolved from this file's own location only — never from the environment. */
 function maybeSpawnReaper() {
-  const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT ?? process.env.PLUGIN_ROOT ?? dirname(HOOK_DIR);
-  const job = join(pluginRoot, "scripts", "runtime-job.mjs");
+  const job = join(dirname(HOOK_DIR), "scripts", "runtime-job.mjs");
   if (process.env.VIBE_RUNTIME_JOB === "1" || !existsSync(job)) {
     return;
   }
@@ -61,7 +68,7 @@ function main() {
     additionalContext = formatMarkdown(resolveRouting({ host, cwd: process.cwd(), home: homedir() }));
   } catch (e) {
     const kind = e instanceof RoutingError ? "routing" : "internal";
-    additionalContext = `<VIBE_ROUTING host="${host}" error="${kind}">\n${e.message}\n</VIBE_ROUTING>\n`;
+    additionalContext = `<VIBE_ROUTING host="${host}" error="${kind}">\n${sanitizeForBlock(e.message)}\n</VIBE_ROUTING>\n`;
   }
 
   process.stdout.write(

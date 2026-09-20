@@ -17,12 +17,14 @@
  *                        [--egress <provider>=<class>[,<class>]]...
  *                        [--project-install <cmd>] [--project-test <cmd>]
  *                        [--project-disposable <a,b>] --yes
- *   node init.mjs bridges --host claude|codex [--dry-run]
+ *   node init.mjs bridges --host claude|codex [--yes] [--dry-run]
+ *                        (third-party plugin installs only run with --yes; otherwise, like
+ *                        --dry-run, the commands are only printed)
  *   node init.mjs show --host claude|codex [--cwd <dir>]
  *   node init.mjs agents-cap --max-parallel <n> [--codex-config <path>]
  */
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, renameSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -371,9 +373,12 @@ export function writeRouting({
   }
 
   const file = buildRoutingFile({ scope, profile: resolvedProfile, roles, egress: egressObj, project, existing });
+  // Carry through any top-level key this tool doesn't know about — `file`'s known
+  // keys still win (it's always the second, higher-precedence spread).
+  const output = { ...(existing ?? {}), ...file };
 
   mkdirSync(dirname(targetPath), { recursive: true });
-  writeFileSync(targetPath, `${JSON.stringify(file, null, 2)}\n`);
+  writeFileSync(targetPath, `${JSON.stringify(output, null, 2)}\n`);
   return targetPath;
 }
 
@@ -431,7 +436,10 @@ function runBridgeCommand(line, env) {
  * (plain node has no TOML round-trip so an existing table is left
  * untouched and its exact lines are handed back to print). A fresh (absent
  * or empty) config starts directly at `[agents]`; an existing non-empty
- * config gets a blank-line-separated `[agents]` block appended.
+ * config gets a blank-line-separated `[agents]` block appended. The write
+ * itself goes to a sibling temp file and `renameSync`s over the target
+ * (atomic — no reader ever sees a half-written config), and refuses
+ * outright when the target path is a symlink.
  *
  * @param {{ codexConfigPath: string, maxParallel: number }} opts
  * @returns {{ action: "appended"|"print", lines: string[] }}
@@ -444,8 +452,20 @@ export function ensureAgentsCap({ codexConfigPath, maxParallel }) {
   if (hasSection) {
     return { action: "print", lines };
   }
+  let stat;
+  try {
+    stat = lstatSync(codexConfigPath);
+  } catch {
+    stat = null; // absent — nothing to refuse
+  }
+  if (stat && stat.isSymbolicLink()) {
+    throw new RoutingError(`refusing to write ${codexConfigPath}: it is a symlink`);
+  }
   mkdirSync(dirname(codexConfigPath), { recursive: true });
-  writeFileSync(codexConfigPath, content === "" ? `${lines.join("\n")}\n` : `${content}\n${lines.join("\n")}\n`);
+  const body = content === "" ? `${lines.join("\n")}\n` : `${content}\n${lines.join("\n")}\n`;
+  const tmpPath = `${codexConfigPath}.${process.pid}.${Date.now()}.tmp`;
+  writeFileSync(tmpPath, body);
+  renameSync(tmpPath, codexConfigPath);
   return { action: "appended", lines };
 }
 
@@ -591,9 +611,13 @@ function main() {
       case "bridges": {
         requireHost(args);
         const { commands } = missingBridges({ host: args.host, home: args.home, cwd: args.cwd, env: process.env });
+        // --dry-run always wins; otherwise these are third-party plugin installs, so they only
+        // run with an explicit --yes. Either way stdout is exactly the command lines — a
+        // "pass --yes to run" hint, when one is warranted, goes to stderr instead.
+        const execute = args.yes && !args.dryRun;
         for (const line of commands) {
           process.stdout.write(`${line}\n`);
-          if (args.dryRun || line === CC_SETUP_REMINDER) {
+          if (!execute || line === CC_SETUP_REMINDER) {
             continue;
           }
           const result = runBridgeCommand(line, process.env);
@@ -604,6 +628,9 @@ function main() {
               : `exit ${result.status}${stderr ? `: ${stderr}` : ""}`;
             throw new RoutingError(`bridges: "${line}" failed (${detail})`);
           }
+        }
+        if (!execute && commands.some((line) => line !== CC_SETUP_REMINDER) && !args.dryRun) {
+          process.stderr.write("pass --yes to run these commands\n");
         }
         break;
       }

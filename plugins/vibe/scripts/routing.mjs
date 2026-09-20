@@ -129,6 +129,12 @@ const NUMERIC_FIELDS = ["max_parallel", "task_budget_minutes", "task_idle_minute
 const EGRESS_PROVIDERS = ["openai", "anthropic"];
 const EGRESS_CLASSES = ["review", "doer"];
 
+// A model is a name (an identifier passed to a runtime), not free text.
+const MODEL_PATTERN = /^[A-Za-z0-9.:-]{1,64}$/;
+// A preset name is joined into a filesystem path — restrict it to a bare
+// lowercase identifier so it can never traverse out of the presets dir.
+const PRESET_NAME_PATTERN = /^[a-z0-9][a-z0-9-]*$/;
+
 const CLAUDE_NATIVE_OVERRIDE_NOTE =
   "claude: a dispatch model beats CLAUDE_CODE_SUBAGENT_MODEL unless CLAUDE_CODE_SUBAGENT_MODEL_FORCE=1";
 
@@ -163,11 +169,32 @@ function validateRuntime(role, runtime, context) {
   }
 }
 
-/** A model value from a routing file (or `--set`) — any non-empty string. */
+/** A model value from a routing file (or `--set`) — a bare name, 1-64 chars of `MODEL_PATTERN`. */
 function validateFileModel(role, model, context) {
-  if (typeof model !== "string" || model.length === 0) {
-    throw new RoutingError(`role "${role}" (${context}): model must be a non-empty string`);
+  if (typeof model !== "string" || !MODEL_PATTERN.test(model)) {
+    throw new RoutingError(`role "${role}" (${context}): model must match ${MODEL_PATTERN}`);
   }
+}
+
+/**
+ * Make a file-derived string safe to interpolate into the `<VIBE_ROUTING>`
+ * block: every value read from a routing file (or a Codex config, for a
+ * hook-side caller) is untrusted and must never be able to forge a fake
+ * `</VIBE_ROUTING>` close, a fake table row, or control-character noise.
+ * Strips control characters, drops `<`/`>`/`|` (the block/row delimiters),
+ * collapses whitespace runs, and caps the result at 120 characters. Exported
+ * so `resolve-routing.mjs` (the SessionStart hook) can apply the same rule
+ * to `RoutingError` messages it folds into the block.
+ *
+ * @param {string} text
+ * @returns {string}
+ */
+export function sanitizeForBlock(text) {
+  return String(text)
+    .replace(/[\x00-\x1f\x7f]/g, " ")
+    .replace(/[<>|]/g, "")
+    .replace(/ {2,}/g, " ")
+    .slice(0, 120);
 }
 
 /** An `egress` block's shape: only `openai`/`anthropic` keys, only `review`/`doer` classes. */
@@ -195,6 +222,12 @@ function validateEgressAck(egress, context) {
  * @returns {Preset}
  */
 export function loadPreset(name, presetsDir = DEFAULT_PRESETS_DIR) {
+  // A preset name is joined into a filesystem path below — validate the shape
+  // before that join, not after, so no `name` ever reaches it unchecked.
+  if (typeof name !== "string" || !PRESET_NAME_PATTERN.test(name)) {
+    const clean = sanitizeForBlock(String(name));
+    throw new RoutingError(`invalid preset name "${clean}": must match ${PRESET_NAME_PATTERN}`);
+  }
   const path = join(presetsDir, `${name}.json`);
   let raw;
   try {
@@ -205,8 +238,9 @@ export function loadPreset(name, presetsDir = DEFAULT_PRESETS_DIR) {
   let data;
   try {
     data = JSON.parse(raw);
-  } catch (e) {
-    throw new RoutingError(`preset "${name}": invalid JSON (${e.message})`);
+  } catch {
+    // Path only — never the parser's message, which can echo file content.
+    throw new RoutingError(`preset ${path}: invalid JSON`);
   }
   const rolesObj = data.roles;
   if (!rolesObj || typeof rolesObj !== "object") {
@@ -313,8 +347,9 @@ function loadRoutingFile(path, { allowProject }) {
   let data;
   try {
     data = JSON.parse(raw);
-  } catch (e) {
-    throw new RoutingError(`routing file ${path}: invalid JSON (${e.message})`);
+  } catch {
+    // Path only — never the parser's message, which can echo file content.
+    throw new RoutingError(`routing file ${path}: invalid JSON`);
   }
   if (!allowProject && data.project !== undefined) {
     throw new RoutingError(`routing file ${path}: "project" is only allowed in the project-scope routing file`);
@@ -618,7 +653,7 @@ export function resolveRouting({
     nativeOverrides = CLAUDE_NATIVE_OVERRIDE_NOTE;
   } else {
     const configPath = codexConfigPath ?? join(home, ".codex", "config.toml");
-    const networkAccess = readNetworkAccess(configPath);
+    const networkAccess = sanitizeForBlock(readNetworkAccess(configPath));
     nativeOverrides =
       `codex: live /permissions overrides are reapplied to children; ` +
       `sandbox_workspace_write.network_access=${networkAccess}`;
@@ -655,11 +690,21 @@ export function resolveRouting({
  */
 export function formatMarkdown(resolved) {
   const lines = [];
-  lines.push(`<VIBE_ROUTING host="${resolved.host}" profile="${resolved.profile}" source="${resolved.source}">`);
+  // Every value below traces back to a routing file (model/effort/profile/
+  // source/project.*) — sanitizeForBlock() keeps it from forging block/row
+  // structure. Clean values pass through unchanged (it's a no-op on the
+  // charset the rest of this file already validates), so the row/line shape
+  // asserted elsewhere for well-formed input is unaffected.
+  const profile = sanitizeForBlock(resolved.profile);
+  const source = sanitizeForBlock(resolved.source);
+  lines.push(`<VIBE_ROUTING host="${resolved.host}" profile="${profile}" source="${source}">`);
   lines.push("| role | runtime | adapter | model | effort | source |");
   for (const role of ROLES) {
     const r = resolved.roles[role];
-    lines.push(`| ${role} | ${r.resolvedRuntime} | ${r.adapter} | ${r.model} | ${r.effort} | ${r.source} |`);
+    const model = sanitizeForBlock(r.model);
+    const effort = sanitizeForBlock(r.effort);
+    const rowSource = sanitizeForBlock(r.source);
+    lines.push(`| ${role} | ${r.resolvedRuntime} | ${r.adapter} | ${model} | ${effort} | ${rowSource} |`);
   }
   lines.push(`max_parallel: ${resolved.max_parallel}`);
   lines.push(`task_budget_minutes: ${resolved.task_budget_minutes}`);
@@ -673,10 +718,12 @@ export function formatMarkdown(resolved) {
     lines.push("project: none");
   } else {
     const p = resolved.project;
-    const disposablePaths = fmtList(p.disposable_paths);
-    const secretAllowlist = fmtList(p.secret_allowlist);
+    const install = sanitizeForBlock(p.install);
+    const test = sanitizeForBlock(p.test);
+    const disposablePaths = fmtList(p.disposable_paths.map(sanitizeForBlock));
+    const secretAllowlist = fmtList(p.secret_allowlist.map(sanitizeForBlock));
     lines.push(
-      `project: install="${p.install}" test="${p.test}" ` +
+      `project: install="${install}" test="${test}" ` +
         `disposable_paths=${disposablePaths} secret_allowlist=${secretAllowlist}`,
     );
   }
