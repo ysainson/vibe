@@ -4,7 +4,7 @@
 
 A personal Claude Code plugin marketplace that turns "vibe coding" into a disciplined, model-adaptive pipeline: idea → brief → scaffold → test-first build, where **every diff is reviewed** and an **independent fresh-context verifier signs off** before anything is called done. Same casual, one-command surface as vibe coding — TDD-first, mandatory review, and a separate verifier underneath.
 
-The bet is on process, not a bigger model: tight contracts, staged review, and model-tiering are what make it good, and the whole kit flips from Opus 4.8 today to Fable 5 later with one environment variable and zero file edits.
+The bet is on process, not a bigger model: tight contracts, staged review, and model-tiering are what make it good, and a `routing.json` config file — not a code edit — is what points every role at whichever model and runtime you want, today or later.
 
 ## Install
 
@@ -52,6 +52,7 @@ The orchestration engine. Pure process — no framework knowledge.
 | Component | What it is |
 |---|---|
 | `/vibe:setup` | Brief-driven scaffolder: reads a project brief, asks only the gaps via `vibe:clarify`, detects the stack, scaffolds the skeleton + tooling baseline + `CLAUDE.md` (not features), and writes `.claude/settings.json` enabling the VIBE core and the matching stack overlay. User-only (`disable-model-invocation: true`). |
+| `/vibe:init` | Sets up VIBE routing, bridges, and shared project context — detects installed runtimes, walks presets/roles/egress/scope with a default on every question, then writes and verifies via `init.mjs` and, at project scope, `share.mjs`. User-only (`disable-model-invocation: true`). |
 | `/vibe:brainstorm` | Turn an idea into a written spec in `docs/specs/` — wraps superpowers' `brainstorming` and applies VIBE's heuristics (two-phase build for visual-hero apps; numbered, test-first, commit-per-task plans). User-only. |
 | `/vibe:review-plan` | Adversarial review of a spec/plan **before code** — parallel skeptic lenses verify its claims against the real codebase (plus an optional Codex cross-model check), synthesized into one Critical/Major/Minor report with a `ready` / `ready-with-fixes` / `needs-rework` gate, iterating resolution-aware re-reviews until `ready`. The gate between `/vibe:brainstorm` and `/vibe:conduct`. User-only. |
 | `/vibe:conduct` | Orchestrated coding flow: the session model plans, writes a failing test contract, lays out a numbered commit-per-task plan, delegates implementation to model-tiered doer subagents, reviews **every** diff in two passes, and gates completion through an independent fresh-context verifier. A thin command wrapper over the `conduct` skill — commands display namespaced (`/vibe:*`) in autocomplete while the backing skill carries `user-invocable: false` to stay model-invocable without a duplicate menu entry. |
@@ -59,14 +60,14 @@ The orchestration engine. Pure process — no framework knowledge.
 | `/vibe:commit` | Conventional commit message from the diff → clipboard. User-only. |
 | `/vibe:fix` | Auto-fix only safe, mechanical issues (formatters/linters + project-local fixers); never security or behavior. User-only. |
 | `/vibe:quick-check` | Fast pre-commit sanity check on changed files — secrets scan + the overlay's quick guardians + project-local lightweight checks. |
-| `vibe:doer` | Implementation subagent (Sonnet by default). |
-| `vibe:doer-mechanical` | Mechanical-edit subagent (Haiku by default) — renames, codemods, boilerplate. |
+| `vibe:doer` | Implementation subagent (Sonnet under the `tiered` preset). |
+| `vibe:doer-mechanical` | Mechanical-edit subagent (Haiku under the `tiered` preset) — renames, codemods, boilerplate. |
 | `vibe:reviewer-spec` | Review pass 1: spec compliance — does the diff meet the contract, nothing gamed? |
 | `vibe:reviewer-quality` | Review pass 2: craft — simplicity, idioms, conventions, no scope creep. Kept separate from pass 1 because a blended review is easier to game. |
 | `vibe:verifier` | Fresh-context final gate — adversarial spec check on the diff with no implementation history. |
 | `vibe:security-verifier` | Security lens: secrets, injection, authz, data handling, dependencies. |
 | `vibe:clarify` | Hidden behavior skill: clarifying questions go through the AskUserQuestion tool (concrete options, recommended default, self-contained); defines when to ask vs state an assumption and proceed. |
-| `vibe:profile-policy` | Hidden knowledge skill: how model routing works — the PROFILE tiers and the one global Opus↔Fable switch. |
+| `vibe:profile-policy` | Hidden knowledge skill: how model routing works — the `routing.json` file, its presets and adapters, and requested vs effective model resolution. |
 | `vibe:fable-safe-authoring` | Hidden knowledge skill: authoring constraints so every skill/command/agent runs well on frontier models and never silently falls back. |
 
 ### `vibe-swift` — Swift / macOS overlay
@@ -118,7 +119,9 @@ brainstorm → spec → review-plan (adversarial gate) → test-contract → pla
 
 ## Model routing
 
-Routing lives in **one place**: the `PROFILE` line + table in `plugins/vibe/skills/conduct/SKILL.md`. `tiered` routes doers to Sonnet/Haiku with Opus as escalation; `uniform` runs every role on the session model — switch to it when cost-tiering isn't wanted or smaller tiers aren't available. No role is ever tied to a model name, so changing the session model needs no edits here. To flip the whole kit to a different model, set the `CLAUDE_CODE_SUBAGENT_MODEL` environment variable (highest-priority override, zero file edits). See `vibe:profile-policy`.
+Routing lives in a config file, `routing.json` — user scope at `~/.agents/vibe/routing.json`, project scope at `.agents/vibe/routing.json` (project overrides user, per role). Three shipped presets: `uniform` (every role on the session model, except the `contract-writer` pin and the three cross-check roles), `tiered` (doer, review, and verification roles cost-routed on the `claude` runtime — Sonnet/Haiku for doers, Opus for escalation and review — while the three cross-check roles still go to the other runtime's companion), and `split` (doer roles move to the other installed runtime, review and escalation stay on `claude`/`opus`). No role is ever tied to a model name in prose, so changing models or runtimes is an edit to `routing.json`, not a rewrite. `/vibe:init` writes and verifies the file (detects installed runtimes, picks a default preset, walks egress consent). A SessionStart hook injects the resolved routing as a `<VIBE_ROUTING>` block into every session, which `vibe:conduct`, `/vibe:review`, `/vibe:review-plan`, and `/vibe:quick-check` read. Full policy — presets, adapters, requested vs effective resolution — lives in `vibe:profile-policy`.
+
+Both runtimes read the same project context, not just the same routing: `AGENTS.md` at the repo root is canonical, and `CLAUDE.md` imports it (`@AGENTS.md` plus a `## Claude Code only` section) rather than duplicating it. `.agents/skills` is the canonical skills directory, with per-skill symlinks from `.claude/skills` and `.codex/skills`. `/vibe:init` at project scope runs the migration with a preview, a confirmation, and a backup.
 
 ## Conventions
 

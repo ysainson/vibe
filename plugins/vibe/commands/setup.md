@@ -37,7 +37,7 @@ The brief is `$ARGUMENTS` (a path to a brief markdown file). If empty, look for 
    ```
    Key each marketplace by its name; key each plugin as `<plugin>@<marketplace>`. Include only the overlays you actually selected — enabling a plugin cascades to its pinned dependencies.
 
-6. **Hand off.** Tell the user to accept the workspace-trust dialog (or run `/reload-plugins`) so the overlay and its skills load, then to run `/vibe:conduct` to build test-first.
+6. **Hand off.** Tell the user to accept the workspace-trust dialog (or run `/reload-plugins`) so the overlay and its skills load, then to run `/vibe:init` to set up routing, bridges, and shared context, then `/vibe:conduct` to build test-first.
 
 ## Rules
 

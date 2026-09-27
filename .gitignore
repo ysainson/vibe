@@ -1,3 +1,6 @@
 node_modules/
 *.log
 .DS_Store
+docs/local/
+.share-backup-*.tar
+.worktrees/
