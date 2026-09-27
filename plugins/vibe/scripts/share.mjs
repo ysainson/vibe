@@ -463,14 +463,9 @@ export function planShare({ scope, cwd, home, prefer } = {}) {
     ]) {
       const sidePath = join(sideDir, name);
       if (side.type === "symlink") {
-        if (side.underCanonical) {
-          operations.push({
-            kind: "skip-migrated",
-            from: sidePath,
-            to: side.resolved,
-            detail: `already points into .agents/skills (${relative(canonicalDir, side.resolved)})`,
-          });
-        } else if (!side.exists) {
+        // Dangling wins over "points into .agents/skills": a link into a missing
+        // canonical entry is a repair, never silently skipped as migrated.
+        if (!side.exists) {
           repairs.push({ path: sidePath, detail: `dangling symlink -> ${side.target}` });
           if (canonicalReal) {
             operations.push({
@@ -480,6 +475,13 @@ export function planShare({ scope, cwd, home, prefer } = {}) {
               detail: "replace dangling symlink with the canonical link",
             });
           }
+        } else if (side.underCanonical) {
+          operations.push({
+            kind: "skip-migrated",
+            from: sidePath,
+            to: side.resolved,
+            detail: `already points into .agents/skills (${relative(canonicalDir, side.resolved)})`,
+          });
         } else {
           repairs.push({ path: sidePath, detail: "points outside .agents/skills" });
         }

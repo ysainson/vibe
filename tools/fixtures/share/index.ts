@@ -43,8 +43,9 @@ export function buildIrisLikeRepo(dir: string): void {
 
   // Claude side: alpha already migrated (symlink into .agents/skills).
   link(dir, ".claude/skills/alpha", "../../.agents/skills/alpha");
-  // Two dangling symlinks: their targets do not exist anywhere.
-  link(dir, ".claude/skills/deploy-to-vercel", "../../.vendor/vercel/deploy-to-vercel");
+  // Two dangling symlinks: their targets do not exist anywhere. deploy-to-vercel dangles
+  // into .agents/skills (the real IRIS shape); vercel-cli-with-tokens dangles outside it.
+  link(dir, ".claude/skills/deploy-to-vercel", "../../.agents/skills/deploy-to-vercel");
   link(dir, ".claude/skills/vercel-cli-with-tokens", "../../.vendor/vercel/vercel-cli-with-tokens");
   // delta: real dir, Claude side only, no `name:` (the dir is the name).
   write(dir, ".claude/skills/delta/SKILL.md", "---\ndescription: Delta has no name key.\n---\n\n# delta\n");

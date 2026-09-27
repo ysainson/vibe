@@ -162,6 +162,7 @@ test("dangling symlinks are reported as repairs, never silently skipped or delet
     const plan = planIris(cwd);
     for (const name of ["deploy-to-vercel", "vercel-cli-with-tokens"]) {
       expect(plan.repairs.some((r: any) => r.path.includes(name))).toBe(true);
+      expect(ops(plan, "skip-migrated").some((o) => mentions(o, name))).toBe(false);
       // The name does not exist in .agents/skills, so there is nothing canonical to relink to.
       expect(ops(plan, "symlink").some((o) => mentions(o, name))).toBe(false);
     }
